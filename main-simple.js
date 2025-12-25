@@ -1,28 +1,221 @@
+// main-simple.js - Исправленная версия с полной интеграцией Telegram
 
-// main-simple.js - Простая и надежная инициализация
-
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Приложение запускается...');
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('🚀 Инициализация приложения...');
     
-    // 1. Гарантируем, что главное меню видно
+    // 1. Инициализация хранилища
+    initStorage();
+    
+    // 2. Инициализация пользователя (ОБЯЗАТЕЛЬНО через Telegram)
+    await initTelegramUser();
+    
+    // 3. Гарантируем показ главного меню
     forceShowMainMenu();
     
-    // 2. Инициализируем базовые данные
-    initBasicStorage();
-    
-    // 3. Создаем тестового пользователя если нет
-    initTestUser();
-    
-    // 4. Настраиваем обработчики
+    // 4. Настройка обработчиков
     setupEventListeners();
     
-    // 5. Обновляем UI
+    // 5. Обновление UI
     updateUI();
     
-    console.log('✅ Главное меню готово!');
+    // 6. Показ приветствия
+    showWelcomeMessage();
+    
+    console.log('✅ Приложение готово!');
 });
 
-// Принудительно показываем главное меню
+// Инициализация хранилища
+function initStorage() {
+    // Базовая инициализация
+    if (!localStorage.getItem('ticTacToeUsers')) {
+        localStorage.setItem('ticTacToeUsers', JSON.stringify([]));
+    }
+    if (!localStorage.getItem('ticTacToeGames')) {
+        localStorage.setItem('ticTacToeGames', JSON.stringify([]));
+    }
+    if (!localStorage.getItem('ticTacToeTransactions')) {
+        localStorage.setItem('ticTacToeTransactions', JSON.stringify([]));
+    }
+    if (!localStorage.getItem('botCommissions')) {
+        localStorage.setItem('botCommissions', JSON.stringify([]));
+    }
+    
+    console.log('Хранилище инициализировано');
+}
+
+// Инициализация пользователя Telegram
+async function initTelegramUser() {
+    console.log('🔐 Инициализация пользователя Telegram...');
+    
+    // Проверяем наличие Telegram Web App
+    if (window.Telegram && Telegram.WebApp) {
+        try {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+            
+            const tgUser = Telegram.WebApp.initDataUnsafe?.user;
+            
+            if (tgUser && tgUser.id) {
+                console.log('Пользователь Telegram найден:', tgUser);
+                
+                // Парсим данные из Telegram
+                const user = await parseTelegramUser(tgUser);
+                setCurrentUser(user);
+                
+                // Обновляем аватар и имя в реальном времени
+                updateTelegramUserInfo(tgUser);
+                
+                return user;
+            } else {
+                console.warn('Данные пользователя Telegram не найдены');
+                createFallbackUser();
+            }
+        } catch (error) {
+            console.error('Ошибка Telegram Web App:', error);
+            createFallbackUser();
+        }
+    } else {
+        console.warn('Telegram Web App не обнаружен. Локальный режим.');
+        createFallbackUser();
+    }
+}
+
+// Парсинг данных пользователя из Telegram
+async function parseTelegramUser(tgUser) {
+    const users = JSON.parse(localStorage.getItem('ticTacToeUsers') || '[]');
+    const telegramId = tgUser.id;
+    
+    // Ищем существующего пользователя
+    let user = users.find(u => u.telegramId === telegramId);
+    
+    if (!user) {
+        // Создаем нового пользователя
+        user = {
+            id: Date.now(),
+            telegramId: telegramId,
+            username: generateUsername(tgUser),
+            firstName: tgUser.first_name || '',
+            lastName: tgUser.last_name || '',
+            languageCode: tgUser.language_code || 'ru',
+            isPremium: tgUser.is_premium || false,
+            gameBalance: 100, // Стартовый баланс
+            realBalance: 0,
+            totalGames: 0,
+            totalWins: 0,
+            isAdmin: telegramId === 6283217323, // Специальный Telegram ID для админа
+            isPartner: false,
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString()
+        };
+        
+        // Если есть фото, сохраняем ссылку
+        if (tgUser.photo_url) {
+            user.photoUrl = tgUser.photo_url;
+        }
+        
+        users.push(user);
+        localStorage.setItem('ticTacToeUsers', JSON.stringify(users));
+        
+        console.log('Создан новый пользователь:', user.username);
+    } else {
+        // Обновляем последний логин
+        user.lastLogin = new Date().toISOString();
+        
+        // Обновляем данные если изменились
+        if (tgUser.photo_url && !user.photoUrl) {
+            user.photoUrl = tgUser.photo_url;
+        }
+        
+        // Сохраняем обновления
+        const index = users.findIndex(u => u.id === user.id);
+        if (index !== -1) {
+            users[index] = user;
+            localStorage.setItem('ticTacToeUsers', JSON.stringify(users));
+        }
+    }
+    
+    // Устанавливаем как текущего пользователя
+    localStorage.setItem('currentUserId', user.id.toString());
+    
+    return user;
+}
+
+// Генерация имени пользователя из данных Telegram
+function generateUsername(tgUser) {
+    if (tgUser.username) {
+        return tgUser.username;
+    }
+    
+    if (tgUser.first_name && tgUser.last_name) {
+        return `${tgUser.first_name}_${tgUser.last_name}`.substring(0, 20);
+    }
+    
+    if (tgUser.first_name) {
+        return tgUser.first_name.substring(0, 20);
+    }
+    
+    return `Player_${tgUser.id.toString().slice(-6)}`;
+}
+
+// Создание резервного пользователя (если нет Telegram)
+function createFallbackUser() {
+    const users = JSON.parse(localStorage.getItem('ticTacToeUsers') || '[]');
+    
+    // Проверяем есть ли уже пользователи
+    if (users.length === 0) {
+        const fallbackUser = {
+            id: 1,
+            username: 'Игрок',
+            gameBalance: 100,
+            realBalance: 0,
+            totalGames: 0,
+            totalWins: 0,
+            isAdmin: false,
+            isPartner: false,
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString()
+        };
+        
+        users.push(fallbackUser);
+        localStorage.setItem('ticTacToeUsers', JSON.stringify(users));
+        localStorage.setItem('currentUserId', '1');
+        
+        console.log('Создан резервный пользователь');
+        return fallbackUser;
+    }
+    
+    return users[0];
+}
+
+// Обновление информации пользователя Telegram в UI
+function updateTelegramUserInfo(tgUser) {
+    const usernameElement = document.getElementById('username');
+    const avatarElement = document.getElementById('userAvatar');
+    
+    if (usernameElement) {
+        usernameElement.textContent = tgUser.first_name || tgUser.username || 'Игрок';
+    }
+    
+    if (avatarElement && tgUser.photo_url) {
+        // Создаем изображение для предзагрузки
+        const img = new Image();
+        img.onload = function() {
+            avatarElement.innerHTML = '';
+            avatarElement.appendChild(img);
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.borderRadius = '50%';
+            img.style.objectFit = 'cover';
+        };
+        img.onerror = function() {
+            // Если фото не загрузилось, показываем иконку
+            avatarElement.innerHTML = '<i class="fas fa-user"></i>';
+        };
+        img.src = tgUser.photo_url;
+    }
+}
+
+// Принудительный показ главного меню
 function forceShowMainMenu() {
     const gameContainer = document.getElementById('game-container');
     const mainMenu = document.querySelector('.main-menu');
@@ -42,178 +235,105 @@ function forceShowMainMenu() {
     });
 }
 
-// Инициализация базового хранилища
-function initBasicStorage() {
-    if (!localStorage.getItem('ticTacToeUsers')) {
-        localStorage.setItem('ticTacToeUsers', JSON.stringify([]));
-        console.log('Создано пустое хранилище пользователей');
+// Получение текущего пользователя
+function getCurrentUser() {
+    const userId = localStorage.getItem('currentUserId');
+    if (!userId) return null;
+    
+    const users = JSON.parse(localStorage.getItem('ticTacToeUsers') || '[]');
+    return users.find(u => u.id.toString() === userId);
+}
+
+// Установка текущего пользователя
+function setCurrentUser(user) {
+    if (user && user.id) {
+        localStorage.setItem('currentUserId', user.id.toString());
+        return true;
+    }
+    return false;
+}
+
+// Обновление UI
+function updateUI() {
+    const user = getCurrentUser();
+    if (!user) return;
+    
+    // Имя пользователя
+    const usernameElement = document.getElementById('username');
+    if (usernameElement && !usernameElement.textContent) {
+        usernameElement.textContent = user.username || 'Игрок';
     }
     
-    if (!localStorage.getItem('ticTacToeGames')) {
-        localStorage.setItem('ticTacToeGames', JSON.stringify([]));
+    // Балансы
+    updateBalanceDisplay();
+    
+    // Роли
+    const adminBtn = document.getElementById('adminBtn');
+    const partnerBtn = document.getElementById('partnerBtn');
+    
+    if (adminBtn) {
+        adminBtn.style.display = user.isAdmin ? 'block' : 'none';
     }
     
-    if (!localStorage.getItem('ticTacToeTransactions')) {
-        localStorage.setItem('ticTacToeTransactions', JSON.stringify([]));
+    if (partnerBtn) {
+        partnerBtn.style.display = user.isPartner ? 'block' : 'none';
+    }
+    
+    // Аватар
+    const avatarElement = document.getElementById('userAvatar');
+    if (avatarElement && user.photoUrl && !avatarElement.querySelector('img')) {
+        const img = document.createElement('img');
+        img.src = user.photoUrl;
+        img.alt = 'Аватар';
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.borderRadius = '50%';
+        img.style.objectFit = 'cover';
+        avatarElement.innerHTML = '';
+        avatarElement.appendChild(img);
     }
 }
 
-// Создание тестового пользователя
-function initTestUser() {
-    const users = JSON.parse(localStorage.getItem('ticTacToeUsers') || '[]');
+// Обновление отображения баланса
+function updateBalanceDisplay() {
+    const user = getCurrentUser();
+    if (!user) return;
     
-    if (users.length === 0) {
-        // Создаем обычного пользователя
-        const testUser = {
-            id: 1,
-            username: 'Игрок',
-            gameBalance: 100,
-            realBalance: 0,
-            totalGames: 0,
-            totalWins: 0,
-            isAdmin: false,
-            isPartner: false,
-            createdAt: new Date().toISOString()
-        };
-        
-        users.push(testUser);
-        localStorage.setItem('ticTacToeUsers', JSON.stringify(users));
-        localStorage.setItem('currentUserId', '1');
-        
-        console.log('Создан тестовый пользователь с балансом 100 монет');
+    const realBalanceEl = document.getElementById('realBalance');
+    const gameBalanceEl = document.getElementById('gameBalance');
+    
+    if (realBalanceEl) {
+        realBalanceEl.textContent = (user.realBalance || 0).toFixed(2);
     }
     
-    // Проверяем Telegram Web App
-    if (window.Telegram && Telegram.WebApp) {
-        Telegram.WebApp.ready();
-        Telegram.WebApp.expand();
-        
-        const tgUser = Telegram.WebApp.initDataUnsafe?.user;
-        if (tgUser) {
-            console.log('Обнаружен пользователь Telegram:', tgUser);
-            
-            // Telegram ID 6283217323 - админ
-            if (tgUser.id === 6283217323) {
-                createOrUpdateAdminUser(tgUser);
-            } else {
-                createOrUpdateTelegramUser(tgUser);
-            }
-        }
+    if (gameBalanceEl) {
+        gameBalanceEl.textContent = (user.gameBalance || 0).toFixed(0);
     }
-}
-
-// Создание/обновление администратора
-function createOrUpdateAdminUser(tgUser) {
-    const users = JSON.parse(localStorage.getItem('ticTacToeUsers') || '[]');
-    const username = tgUser.username || `admin_${tgUser.id}`;
-    
-    let adminUser = users.find(u => u.username === 'KovalchukAdmin');
-    
-    if (!adminUser) {
-        adminUser = {
-            id: 999,
-            username: 'KovalchukAdmin',
-            gameBalance: 5000,
-            realBalance: 10000,
-            totalGames: 0,
-            totalWins: 0,
-            isAdmin: true,
-            isPartner: true,
-            telegramId: tgUser.id,
-            createdAt: new Date().toISOString()
-        };
-        
-        users.push(adminUser);
-        localStorage.setItem('ticTacToeUsers', JSON.stringify(users));
-        console.log('Создан администратор KovalchukAdmin');
-    }
-    
-    localStorage.setItem('currentUserId', adminUser.id.toString());
-    return adminUser;
-}
-
-// Создание/обновление пользователя Telegram
-function createOrUpdateTelegramUser(tgUser) {
-    const users = JSON.parse(localStorage.getItem('ticTacToeUsers') || '[]');
-    const username = tgUser.username || `user_${tgUser.id}`;
-    const telegramId = tgUser.id;
-    
-    let user = users.find(u => u.telegramId === telegramId);
-    
-    if (!user) {
-        user = {
-            id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 100,
-            username: username,
-            gameBalance: 100,
-            realBalance: 0,
-            totalGames: 0,
-            totalWins: 0,
-            isAdmin: false,
-            isPartner: false,
-            telegramId: telegramId,
-            createdAt: new Date().toISOString()
-        };
-        
-        users.push(user);
-        localStorage.setItem('ticTacToeUsers', JSON.stringify(users));
-        console.log('Создан новый пользователь Telegram:', username);
-    }
-    
-    localStorage.setItem('currentUserId', user.id.toString());
-    return user;
 }
 
 // Настройка обработчиков событий
 function setupEventListeners() {
-    console.log('Настраиваем обработчики событий...');
+    console.log('Настройка обработчиков событий...');
     
-    // Кнопка профиля
-    const profileBtn = document.getElementById('profileBtn');
-    if (profileBtn) {
-        profileBtn.addEventListener('click', function() {
-            window.location.href = 'profile.html';
-        });
-    }
+    // Навигация
+    document.getElementById('profileBtn')?.addEventListener('click', () => {
+        window.location.href = 'profile.html';
+    });
     
-    // Кнопка админ-панели
-    const adminBtn = document.getElementById('adminBtn');
-    if (adminBtn) {
-        adminBtn.addEventListener('click', function() {
-            window.location.href = 'admin.html';
-        });
-    }
+    document.getElementById('adminBtn')?.addEventListener('click', () => {
+        window.location.href = 'admin.html';
+    });
     
-    // Кнопка партнёр-панели
-    const partnerBtn = document.getElementById('partnerBtn');
-    if (partnerBtn) {
-        partnerBtn.addEventListener('click', function() {
-            window.location.href = 'partner.html';
-        });
-    }
+    document.getElementById('partnerBtn')?.addEventListener('click', () => {
+        window.location.href = 'partner.html';
+    });
     
-    // Кнопка истории
-    const historyBtn = document.getElementById('historyBtn');
-    if (historyBtn) {
-        historyBtn.addEventListener('click', showHistoryModal);
-    }
+    document.getElementById('historyBtn')?.addEventListener('click', showHistoryModal);
+    document.getElementById('rulesBtn')?.addEventListener('click', showRulesModal);
     
-    // Кнопка пополнения
-    const depositBtn = document.getElementById('depositBtn');
-    if (depositBtn) {
-        depositBtn.addEventListener('click', showDepositModal);
-    }
-    
-    // Кнопка вывода
-    const withdrawBtn = document.getElementById('withdrawBtn');
-    if (withdrawBtn) {
-        withdrawBtn.addEventListener('click', showWithdrawModal);
-    }
-    
-    // Кнопка правил
-    const rulesBtn = document.getElementById('rulesBtn');
-    if (rulesBtn) {
-        rulesBtn.addEventListener('click', showRulesModal);
-    }
+    // Кнопки пополнения и вывода
+    document.getElementById('depositBtn')?.addEventListener('click', showRealDepositModal);
+    document.getElementById('withdrawBtn')?.addEventListener('click', showWithdrawModal);
     
     // Карточки игр
     setupGameCards();
@@ -224,41 +344,28 @@ function setupEventListeners() {
 
 // Настройка карточек игр
 function setupGameCards() {
-    // Игра с ботом
-    const playWithBot = document.getElementById('playWithBot');
-    if (playWithBot) {
-        playWithBot.addEventListener('click', function() {
-            console.log('Выбрана игра с ботом');
-            showBetModal('bot', 'Бот');
-        });
-    }
+    const cards = {
+        'playWithBot': { mode: 'bot', opponent: 'Бот' },
+        'playOnline': { mode: 'online', opponent: 'Онлайн соперник' },
+        'createLobby': { mode: 'private', opponent: 'Друг' },
+        'quickPlay': { mode: 'quick', opponent: 'Случайный соперник' }
+    };
     
-    // Онлайн игра
-    const playOnline = document.getElementById('playOnline');
-    if (playOnline) {
-        playOnline.addEventListener('click', function() {
-            console.log('Выбрана онлайн игра');
-            showBetModal('online', 'Онлайн соперник');
-        });
-    }
-    
-    // Создать лобби
-    const createLobby = document.getElementById('createLobby');
-    if (createLobby) {
-        createLobby.addEventListener('click', function() {
-            console.log('Создание лобби');
-            showBetModal('private', 'Друг');
-        });
-    }
-    
-    // Быстрая игра
-    const quickPlay = document.getElementById('quickPlay');
-    if (quickPlay) {
-        quickPlay.addEventListener('click', function() {
-            console.log('Быстрая игра');
-            showBetModal('quick', 'Случайный соперник');
-        });
-    }
+    Object.keys(cards).forEach(cardId => {
+        const card = document.getElementById(cardId);
+        if (card) {
+            card.addEventListener('click', () => {
+                const user = getCurrentUser();
+                if (!user) {
+                    showNotification('Ошибка авторизации. Перезагрузите приложение.', 'error');
+                    return;
+                }
+                
+                console.log(`Выбрана игра: ${cards[cardId].opponent}`);
+                showBetModal(cards[cardId].mode, cards[cardId].opponent);
+            });
+        }
+    });
 }
 
 // Настройка модального окна ставок
@@ -269,56 +376,57 @@ function setupBetModal() {
     const amountButtons = document.querySelectorAll('.amount-btn');
     const customAmountInput = document.getElementById('customAmount');
     
-    let currentBet = {
-        amount: 0,
+    window.currentBet = {
+        amount: 10,
         balanceType: 'game',
         gameMode: null,
         opponent: null
     };
     
+    // Устанавливаем первую кнопку суммы как активную
+    if (amountButtons.length > 0) {
+        amountButtons[0].classList.add('active');
+        window.currentBet.amount = parseInt(amountButtons[0].dataset.amount) || 10;
+    }
+    
     // Отмена
     if (cancelBtn) {
-        cancelBtn.addEventListener('click', function() {
+        cancelBtn.addEventListener('click', () => {
             document.getElementById('betModal').style.display = 'none';
-            currentBet = { amount: 0, balanceType: 'game', gameMode: null, opponent: null };
+            window.currentBet = { amount: 10, balanceType: 'game', gameMode: null, opponent: null };
         });
     }
     
     // Подтверждение
     if (confirmBtn) {
-        confirmBtn.addEventListener('click', function() {
-            processBet(currentBet);
-        });
+        confirmBtn.addEventListener('click', processBet);
     }
     
     // Выбор типа баланса
     balanceRadios.forEach(radio => {
-        radio.addEventListener('change', function(e) {
-            currentBet.balanceType = e.target.value;
-            updateCommissionNotice(currentBet.gameMode, currentBet.balanceType);
+        radio.addEventListener('change', (e) => {
+            window.currentBet.balanceType = e.target.value;
+            updateCommissionNotice();
         });
     });
     
     // Кнопки суммы
     amountButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
+        button.addEventListener('click', (e) => {
             amountButtons.forEach(btn => btn.classList.remove('active'));
             e.target.classList.add('active');
-            currentBet.amount = parseInt(e.target.dataset.amount);
+            window.currentBet.amount = parseInt(e.target.dataset.amount);
             customAmountInput.value = '';
         });
     });
     
     // Пользовательская сумма
     if (customAmountInput) {
-        customAmountInput.addEventListener('input', function(e) {
+        customAmountInput.addEventListener('input', (e) => {
             amountButtons.forEach(btn => btn.classList.remove('active'));
-            currentBet.amount = parseInt(e.target.value) || 0;
+            window.currentBet.amount = parseInt(e.target.value) || 0;
         });
     }
-    
-    // Сохраняем в глобальную переменную
-    window.currentBet = currentBet;
 }
 
 // Показать модальное окно ставок
@@ -329,18 +437,16 @@ function showBetModal(gameMode, opponent) {
     window.currentBet.gameMode = gameMode;
     window.currentBet.opponent = opponent;
     
-    // Показываем/скрываем уведомление о комиссии
-    updateCommissionNotice(gameMode, window.currentBet.balanceType);
-    
+    updateCommissionNotice();
     modal.style.display = 'flex';
 }
 
 // Обновить уведомление о комиссии
-function updateCommissionNotice(gameMode, balanceType) {
+function updateCommissionNotice() {
     const notice = document.getElementById('commissionNotice');
     if (!notice) return;
     
-    if (gameMode === 'online' && balanceType === 'real') {
+    if (window.currentBet.gameMode === 'online' && window.currentBet.balanceType === 'real') {
         notice.style.display = 'flex';
     } else {
         notice.style.display = 'none';
@@ -348,65 +454,72 @@ function updateCommissionNotice(gameMode, balanceType) {
 }
 
 // Обработка ставки
-function processBet(bet) {
+function processBet() {
     const user = getCurrentUser();
     if (!user) {
-        alert('Пожалуйста, войдите в систему');
+        showNotification('Ошибка авторизации', 'error');
         return;
     }
     
     // Проверка суммы
-    if (bet.amount < 1) {
-        alert('Минимальная сумма ставки: 1');
+    if (window.currentBet.amount < 1) {
+        showNotification('Минимальная сумма ставки: 1', 'error');
         return;
     }
     
     // Проверка баланса
-    if (bet.balanceType === 'game' && user.gameBalance < bet.amount) {
-        alert('Недостаточно игровых средств');
+    if (window.currentBet.balanceType === 'game' && user.gameBalance < window.currentBet.amount) {
+        showNotification('Недостаточно игровых средств', 'error');
         return;
     }
     
-    if (bet.balanceType === 'real' && user.realBalance < bet.amount) {
-        alert('Недостаточно реальных средств');
+    if (window.currentBet.balanceType === 'real' && user.realBalance < window.currentBet.amount) {
+        showNotification('Недостаточно реальных средств', 'error');
         return;
     }
     
     // Списываем ставку
-    if (bet.balanceType === 'game') {
-        user.gameBalance -= bet.amount;
-    } else {
-        user.realBalance -= bet.amount;
-    }
-    
-    // Сохраняем пользователя
     const users = JSON.parse(localStorage.getItem('ticTacToeUsers') || '[]');
     const userIndex = users.findIndex(u => u.id === user.id);
-    if (userIndex !== -1) {
-        users[userIndex] = user;
-        localStorage.setItem('ticTacToeUsers', JSON.stringify(users));
+    
+    if (window.currentBet.balanceType === 'game') {
+        user.gameBalance -= window.currentBet.amount;
+    } else {
+        user.realBalance -= window.currentBet.amount;
     }
+    
+    users[userIndex] = user;
+    localStorage.setItem('ticTacToeUsers', JSON.stringify(users));
     
     // Закрываем модальное окно
     document.getElementById('betModal').style.display = 'none';
     
     // Начинаем игру
-    startGame(bet);
+    startGame(window.currentBet);
     
-    // Сбрасываем ставку
-    window.currentBet = { amount: 0, balanceType: 'game', gameMode: null, opponent: null };
+    // Обновляем UI
+    updateBalanceDisplay();
 }
 
 // Начать игру
 function startGame(bet) {
-    console.log('Начинаем игру:', bet);
+    console.log('🎮 Начинаем игру:', bet);
     
     // Скрываем главное меню
     document.querySelector('.main-menu').style.display = 'none';
     
     // Создаем игровое поле
     const gameContainer = document.getElementById('game-container');
-    gameContainer.innerHTML = `
+    gameContainer.innerHTML = createGameBoardHTML(bet);
+    gameContainer.style.display = 'block';
+    
+    // Инициализируем игру
+    initGame(bet);
+}
+
+// Создание HTML игрового поля
+function createGameBoardHTML(bet) {
+    return `
         <div class="game-header">
             <button class="btn-icon" id="backToMenu">
                 <i class="fas fa-arrow-left"></i>
@@ -436,15 +549,9 @@ function startGame(bet) {
         </div>
         
         <div class="game-board">
-            <div class="cell" data-index="0"></div>
-            <div class="cell" data-index="1"></div>
-            <div class="cell" data-index="2"></div>
-            <div class="cell" data-index="3"></div>
-            <div class="cell" data-index="4"></div>
-            <div class="cell" data-index="5"></div>
-            <div class="cell" data-index="6"></div>
-            <div class="cell" data-index="7"></div>
-            <div class="cell" data-index="8"></div>
+            ${Array(9).fill().map((_, i) => 
+                `<div class="cell" data-index="${i}"></div>`
+            ).join('')}
         </div>
         
         <div class="game-status">
@@ -463,51 +570,41 @@ function startGame(bet) {
             </button>
         </div>
     `;
-    
-    // Показываем игровое поле
-    gameContainer.style.display = 'block';
-    
-    // Кнопка возврата в меню
-    document.getElementById('backToMenu').addEventListener('click', function() {
-        gameContainer.style.display = 'none';
-        document.querySelector('.main-menu').style.display = 'flex';
-        updateUI();
-    });
-    
-    // Инициализируем игру
-    initSimpleGame(bet);
 }
 
-// Простая игра
-function initSimpleGame(bet) {
+// Инициализация игры
+function initGame(bet) {
     const cells = document.querySelectorAll('.cell');
     let currentPlayer = 'X';
     let gameActive = true;
     let board = ['', '', '', '', '', '', '', '', ''];
     
+    // Кнопка возврата в меню
+    document.getElementById('backToMenu').addEventListener('click', () => {
+        document.getElementById('game-container').style.display = 'none';
+        document.querySelector('.main-menu').style.display = 'flex';
+    });
+    
     // Обработчики для клеток
     cells.forEach(cell => {
         cell.addEventListener('click', function() {
+            if (!gameActive) return;
+            
             const index = parseInt(this.dataset.index);
             
-            if (!gameActive || board[index] !== '') return;
+            if (board[index] !== '') return;
             
             // Ход игрока
-            board[index] = currentPlayer;
-            this.textContent = currentPlayer;
-            this.classList.add(currentPlayer.toLowerCase());
+            makeMove(index, currentPlayer);
             
-            // Проверяем победителя
+            // Проверяем результат
             if (checkWinner(board, currentPlayer)) {
-                gameActive = false;
-                showGameResult('win', bet);
+                endGame(currentPlayer === 'X' ? 'win' : 'lose', bet);
                 return;
             }
             
-            // Проверяем ничью
-            if (!board.includes('')) {
-                gameActive = false;
-                showGameResult('draw', bet);
+            if (isBoardFull(board)) {
+                endGame('draw', bet);
                 return;
             }
             
@@ -516,8 +613,8 @@ function initSimpleGame(bet) {
             document.getElementById('currentPlayer').textContent = currentPlayer;
             
             // Если игра с ботом и сейчас ход бота
-            if (bet.gameMode === 'bot' && currentPlayer === 'O' && gameActive) {
-                setTimeout(makeBotMove, 500);
+            if (bet.gameMode === 'bot' && currentPlayer === 'O') {
+                setTimeout(() => makeBotMove(), 500);
             }
         });
     });
@@ -526,136 +623,198 @@ function initSimpleGame(bet) {
     if (bet.gameMode === 'bot' && Math.random() > 0.5) {
         currentPlayer = 'O';
         document.getElementById('currentPlayer').textContent = currentPlayer;
-        setTimeout(makeBotMove, 1000);
+        setTimeout(() => makeBotMove(), 1000);
+    }
+    
+    // Ход игрока
+    function makeMove(index, player) {
+        board[index] = player;
+        cells[index].textContent = player;
+        cells[index].classList.add(player.toLowerCase());
     }
     
     // Ход бота
     function makeBotMove() {
         if (!gameActive) return;
         
-        // Находим пустые клетки
-        const emptyCells = [];
-        cells.forEach((cell, index) => {
-            if (board[index] === '') {
-                emptyCells.push(index);
+        // Простой ИИ: сначала пытается выиграть, потом блокирует, потом случайный ход
+        let move = findWinningMove(board, 'O') || 
+                   findWinningMove(board, 'X') || 
+                   findBestMove(board);
+        
+        if (move !== null) {
+            makeMove(move, 'O');
+            
+            // Проверяем результат
+            if (checkWinner(board, 'O')) {
+                endGame('lose', bet);
+                return;
             }
-        });
+            
+            if (isBoardFull(board)) {
+                endGame('draw', bet);
+                return;
+            }
+            
+            // Возвращаем ход игроку
+            currentPlayer = 'X';
+            document.getElementById('currentPlayer').textContent = currentPlayer;
+        }
+    }
+    
+    // Поиск выигрышного хода
+    function findWinningMove(board, player) {
+        for (let i = 0; i < 9; i++) {
+            if (board[i] === '') {
+                const tempBoard = [...board];
+                tempBoard[i] = player;
+                if (checkWinner(tempBoard, player)) {
+                    return i;
+                }
+            }
+        }
+        return null;
+    }
+    
+    // Поиск лучшего хода
+    function findBestMove(board) {
+        // Центр
+        if (board[4] === '') return 4;
         
-        if (emptyCells.length === 0) return;
-        
-        // Случайный ход
-        const randomIndex = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-        
-        board[randomIndex] = 'O';
-        cells[randomIndex].textContent = 'O';
-        cells[randomIndex].classList.add('o');
-        
-        // Проверяем победителя
-        if (checkWinner(board, 'O')) {
-            gameActive = false;
-            showGameResult('lose', bet);
-            return;
+        // Углы
+        const corners = [0, 2, 6, 8];
+        const emptyCorners = corners.filter(i => board[i] === '');
+        if (emptyCorners.length > 0) {
+            return emptyCorners[Math.floor(Math.random() * emptyCorners.length)];
         }
         
-        // Проверяем ничью
-        if (!board.includes('')) {
-            gameActive = false;
-            showGameResult('draw', bet);
-            return;
+        // Стороны
+        const sides = [1, 3, 5, 7];
+        const emptySides = sides.filter(i => board[i] === '');
+        if (emptySides.length > 0) {
+            return emptySides[Math.floor(Math.random() * emptySides.length)];
         }
         
-        // Возвращаем ход игроку
-        currentPlayer = 'X';
-        document.getElementById('currentPlayer').textContent = currentPlayer;
+        return null;
     }
     
     // Проверка победителя
     function checkWinner(board, player) {
-        const winningCombinations = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Горизонтали
-            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Вертикали
-            [0, 4, 8], [2, 4, 6] // Диагонали
+        const winPatterns = [
+            [0,1,2], [3,4,5], [6,7,8], // Горизонтали
+            [0,3,6], [1,4,7], [2,5,8], // Вертикали
+            [0,4,8], [2,4,6] // Диагонали
         ];
         
-        return winningCombinations.some(combination => {
-            return combination.every(index => board[index] === player);
-        });
+        return winPatterns.some(pattern => 
+            pattern.every(index => board[index] === player)
+        );
+    }
+    
+    // Проверка заполненности поля
+    function isBoardFull(board) {
+        return !board.includes('');
+    }
+    
+    // Завершение игры
+    function endGame(result, bet) {
+        gameActive = false;
+        
+        const resultElement = document.querySelector('.game-result');
+        const continueBtn = document.getElementById('continueGame');
+        
+        // Показываем результат
+        if (result === 'win') {
+            resultElement.innerHTML = `
+                <div class="result-win">
+                    <i class="fas fa-trophy"></i>
+                    <span>Вы выиграли!</span>
+                </div>
+            `;
+            processGameResult('win', bet);
+        } else if (result === 'lose') {
+            resultElement.innerHTML = `
+                <div class="result-lose">
+                    <i class="fas fa-times-circle"></i>
+                    <span>Вы проиграли</span>
+                </div>
+            `;
+            processGameResult('lose', bet);
+        } else {
+            resultElement.innerHTML = `
+                <div class="result-draw">
+                    <i class="fas fa-handshake"></i>
+                    <span>Ничья!</span>
+                </div>
+            `;
+            processGameResult('draw', bet);
+        }
+        
+        // Показываем кнопку продолжения
+        if (continueBtn) {
+            continueBtn.style.display = 'block';
+            continueBtn.addEventListener('click', () => {
+                document.getElementById('game-container').style.display = 'none';
+                document.querySelector('.main-menu').style.display = 'flex';
+                updateUI();
+            });
+        }
     }
 }
 
-// Показать результат игры
-function showGameResult(result, bet) {
-    const resultElement = document.querySelector('.game-result');
-    const continueBtn = document.getElementById('continueGame');
-    
-    if (result === 'win') {
-        resultElement.innerHTML = `
-            <div class="result-win">
-                <i class="fas fa-trophy"></i>
-                <span>Вы выиграли!</span>
-            </div>
-        `;
-        
-        // Начисляем выигрыш
-        processWin(bet);
-        
-    } else if (result === 'lose') {
-        resultElement.innerHTML = `
-            <div class="result-lose">
-                <i class="fas fa-times-circle"></i>
-                <span>Вы проиграли</span>
-            </div>
-        `;
-    } else {
-        resultElement.innerHTML = `
-            <div class="result-draw">
-                <i class="fas fa-handshake"></i>
-                <span>Ничья!</span>
-            </div>
-        `;
-        
-        // Возвращаем ставку при ничье
-        processDraw(bet);
-    }
-    
-    if (continueBtn) {
-        continueBtn.style.display = 'block';
-        continueBtn.addEventListener('click', function() {
-            document.getElementById('game-container').style.display = 'none';
-            document.querySelector('.main-menu').style.display = 'flex';
-            updateUI();
-        });
-    }
-}
-
-// Обработка выигрыша
-function processWin(bet) {
+// Обработка результата игры
+function processGameResult(result, bet) {
     const user = getCurrentUser();
     if (!user) return;
     
-    let winnings = bet.amount * 2;
+    // Обновляем статистику
+    user.totalGames = (user.totalGames || 0) + 1;
+    if (result === 'win') {
+        user.totalWins = (user.totalWins || 0) + 1;
+    }
+    
+    // Обрабатываем финансовый результат
+    let winnings = 0;
     let commission = 0;
     
-    // Комиссия 5% только для онлайн игр на реальный баланс
-    if (bet.gameMode === 'online' && bet.balanceType === 'real') {
-        commission = winnings * 0.05;
-        winnings = winnings - commission;
+    if (result === 'win') {
+        winnings = bet.amount * 2;
         
-        // Сохраняем комиссию
-        saveCommission(commission, bet);
+        // Комиссия 5% для онлайн игр на реальный баланс
+        if (bet.gameMode === 'online' && bet.balanceType === 'real') {
+            commission = winnings * 0.05;
+            winnings -= commission;
+            
+            // Сохраняем комиссию
+            saveBotCommission(commission, user.id, bet);
+            
+            // Показываем уведомление
+            showNotification(`Бот удержал 5% комиссии: ${commission.toFixed(2)}`, 'info');
+        }
         
-        // Показываем уведомление
-        showNotification(`Комиссия бота: ${commission.toFixed(2)}`, 'info');
-    }
-    
-    // Начисляем выигрыш
-    if (bet.balanceType === 'game') {
-        user.gameBalance += winnings;
+        // Начисляем выигрыш
+        if (bet.balanceType === 'game') {
+            user.gameBalance += winnings;
+        } else {
+            user.realBalance += winnings;
+        }
+        
+        showNotification(`🎉 Вы выиграли ${winnings} ${bet.balanceType === 'game' ? 'монет' : 'USD'}!`, 'success');
+        
+    } else if (result === 'draw') {
+        // Возвращаем ставку при ничье
+        if (bet.balanceType === 'game') {
+            user.gameBalance += bet.amount;
+        } else {
+            user.realBalance += bet.amount;
+        }
+        showNotification('🤝 Ничья! Ставка возвращена', 'info');
     } else {
-        user.realBalance += winnings;
+        // Проигрыш - ставка уже списана
+        showNotification('😔 Вы проиграли', 'error');
     }
     
-    // Сохраняем
+    // Сохраняем пользователя
     const users = JSON.parse(localStorage.getItem('ticTacToeUsers') || '[]');
     const userIndex = users.findIndex(u => u.id === user.id);
     if (userIndex !== -1) {
@@ -663,69 +822,38 @@ function processWin(bet) {
         localStorage.setItem('ticTacToeUsers', JSON.stringify(users));
     }
     
-    // Сохраняем игру
-    saveGame({
+    // Сохраняем запись об игре
+    saveGameRecord({
         userId: user.id,
         mode: bet.gameMode,
         opponent: bet.opponent,
         stake: bet.amount,
         balanceType: bet.balanceType,
-        result: 'win',
+        result: result,
         winnings: winnings,
         commission: commission,
         timestamp: new Date().toISOString()
     });
     
-    // Показываем уведомление
-    showNotification(`🎉 Вы выиграли ${winnings} ${bet.balanceType === 'game' ? 'монет' : 'USD'}!`, 'success');
+    // Обновляем UI
+    updateBalanceDisplay();
 }
 
-// Обработка ничьи
-function processDraw(bet) {
-    const user = getCurrentUser();
-    if (!user) return;
-    
-    // Возвращаем ставку
-    if (bet.balanceType === 'game') {
-        user.gameBalance += bet.amount;
-    } else {
-        user.realBalance += bet.amount;
-    }
-    
-    // Сохраняем
-    const users = JSON.parse(localStorage.getItem('ticTacToeUsers') || '[]');
-    const userIndex = users.findIndex(u => u.id === user.id);
-    if (userIndex !== -1) {
-        users[userIndex] = user;
-        localStorage.setItem('ticTacToeUsers', JSON.stringify(users));
-    }
-    
-    // Сохраняем игру
-    saveGame({
-        userId: user.id,
-        mode: bet.gameMode,
-        opponent: bet.opponent,
-        stake: bet.amount,
-        balanceType: bet.balanceType,
-        result: 'draw',
-        timestamp: new Date().toISOString()
-    });
-}
-
-// Сохранить игру
-function saveGame(gameData) {
+// Сохранение записи игры
+function saveGameRecord(gameData) {
     const games = JSON.parse(localStorage.getItem('ticTacToeGames') || '[]');
     gameData.id = Date.now();
     games.push(gameData);
     localStorage.setItem('ticTacToeGames', JSON.stringify(games));
 }
 
-// Сохранить комиссию
-function saveCommission(amount, bet) {
+// Сохранение комиссии бота
+function saveBotCommission(amount, userId, bet) {
     const commissions = JSON.parse(localStorage.getItem('botCommissions') || '[]');
     commissions.push({
+        id: Date.now(),
         amount: amount,
-        userId: getCurrentUser().id,
+        userId: userId,
         gameMode: bet.gameMode,
         stake: bet.amount,
         timestamp: new Date().toISOString()
@@ -733,82 +861,48 @@ function saveCommission(amount, bet) {
     localStorage.setItem('botCommissions', JSON.stringify(commissions));
 }
 
-// Обновление UI
-function updateUI() {
-    const user = getCurrentUser();
-    if (!user) return;
-    
-    // Имя пользователя
-    const usernameElement = document.getElementById('username');
-    if (usernameElement) {
-        usernameElement.textContent = user.username || 'Игрок';
-    }
-    
-    // Балансы
-    updateBalanceDisplay();
-    
-    // Роли
-    const adminBtn = document.getElementById('adminBtn');
-    const partnerBtn = document.getElementById('partnerBtn');
-    
-    if (adminBtn) {
-        adminBtn.style.display = user.isAdmin ? 'block' : 'none';
-    }
-    
-    if (partnerBtn) {
-        partnerBtn.style.display = user.isPartner ? 'block' : 'none';
-    }
-    
-    // Аватар Telegram
-    if (window.Telegram && Telegram.WebApp) {
-        const tgUser = Telegram.WebApp.initDataUnsafe?.user;
-        if (tgUser && tgUser.photo_url) {
-            const avatar = document.getElementById('userAvatar');
-            if (avatar) {
-                avatar.innerHTML = `<img src="${tgUser.photo_url}" alt="Аватар">`;
-            }
-        }
-    }
-}
-
-// Модальные окна
-function showHistoryModal() {
-    alert('История игр - для полной функциональности откройте профиль');
-}
-
-function showDepositModal() {
-    alert('Пополнение баланса - используйте CryptoBot для реальных платежей');
-}
-
-function showWithdrawModal() {
-    alert('Вывод средств - доступен в партнёрской панели');
-}
-
-function showRulesModal() {
+// Показать модальное окно пополнения
+function showRealDepositModal() {
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.innerHTML = `
         <div class="modal-content">
-            <h2>Правила игры</h2>
-            <div style="max-height: 400px; overflow-y: auto; padding: 10px;">
-                <h3>🎮 Как играть</h3>
-                <p>Игроки по очереди ставят крестики (X) и нолики (O).</p>
-                <p>Цель - занять 3 клетки подряд.</p>
+            <h2><i class="fas fa-wallet"></i> Пополнение баланса</h2>
+            
+            <div class="deposit-options">
+                <div class="deposit-method" id="depositCrypto">
+                    <div class="method-icon">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="method-info">
+                        <h3>Криптовалюта</h3>
+                        <p>USDT, BTC, ETH через CryptoBot</p>
+                    </div>
+                </div>
                 
-                <h3>💰 Ставки</h3>
-                <p>• Игровой баланс - для тренировки</p>
-                <p>• Реальный баланс - с настоящими деньгами</p>
-                <p>• При выигрыше: ставка × 2</p>
-                <p>• При ничье: возврат ставки</p>
+                <div class="deposit-method" id="depositCard">
+                    <div class="method-icon">
+                        <i class="fas fa-credit-card"></i>
+                    </div>
+                    <div class="method-info">
+                        <h3>Банковская карта</h3>
+                        <p>Visa, Mastercard, Мир</p>
+                    </div>
+                </div>
                 
-                <h3>⚡ Комиссия 5%</h3>
-                <p>Взимается только при:</p>
-                <p>• Игре на реальном балансе</p>
-                <p>• Победе в онлайн-игре</p>
-                <p>• Размер: 5% от выигрыша</p>
+                <div class="deposit-method" id="depositTest">
+                    <div class="method-icon">
+                        <i class="fas fa-vial"></i>
+                    </div>
+                    <div class="method-info">
+                        <h3>Тестовое пополнение</h3>
+                        <p>Для разработки и тестирования</p>
+                    </div>
+                </div>
             </div>
+            
             <div class="modal-actions">
-                <button class="btn-primary" id="closeRules">Понятно</button>
+                <button class="btn-secondary" id="closeDeposit">Отмена</button>
             </div>
         </div>
     `;
@@ -816,45 +910,145 @@ function showRulesModal() {
     document.body.appendChild(modal);
     modal.style.display = 'flex';
     
-    modal.querySelector('#closeRules').addEventListener('click', function() {
+    // Обработчики методов пополнения
+    modal.querySelector('#depositCrypto').addEventListener('click', () => {
+        modal.remove();
+        showCryptoDepositModal();
+    });
+    
+    modal.querySelector('#depositCard').addEventListener('click', () => {
+        modal.remove();
+        showCardDepositModal();
+    });
+    
+    modal.querySelector('#depositTest').addEventListener('click', () => {
+        modal.remove();
+        showTestDepositModal();
+    });
+    
+    modal.querySelector('#closeDeposit').addEventListener('click', () => {
         modal.remove();
     });
     
-    modal.addEventListener('click', function(e) {
+    modal.addEventListener('click', (e) => {
         if (e.target === modal) {
             modal.remove();
         }
     });
 }
 
-// Уведомления
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    notification.innerHTML = `
-        <div class="notification-content">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'}"></i>
-            <span>${message}</span>
+// Пополнение криптовалютой
+function showCryptoDepositModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h2><i class="fas fa-coins"></i> Пополнение криптовалютой</h2>
+            
+            <div class="crypto-deposit-content">
+                <div class="deposit-info">
+                    <p>Для пополнения через CryptoBot:</p>
+                    <ol>
+                        <li>Перейдите в бота @CryptoBot</li>
+                        <li>Отправьте команду /start</li>
+                        <li>Выберите "Пополнить баланс"</li>
+                        <li>Укажите сумму в USD</li>
+                        <li>После оплаты баланс обновится автоматически</li>
+                    </ol>
+                </div>
+                
+                <div class="crypto-addresses">
+                    <h3>Или отправьте на адрес:</h3>
+                    <div class="address">
+                        <span>USDT (TRC20):</span>
+                        <code>Txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</code>
+                    </div>
+                    <div class="address">
+                        <span>BTC:</span>
+                        <code>1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</code>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-primary" id="openCryptoBot">Открыть CryptoBot</button>
+                <button class="btn-secondary" id="closeCrypto">Закрыть</button>
+            </div>
         </div>
     `;
     
-    document.body.appendChild(notification);
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
     
-    setTimeout(() => {
-        notification.style.display = 'flex';
-    }, 10);
+    modal.querySelector('#openCryptoBot').addEventListener('click', () => {
+        window.open('https://t.me/CryptoBot', '_blank');
+    });
     
-    setTimeout(() => {
-        notification.style.display = 'none';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
+    modal.querySelector('#closeCrypto').addEventListener('click', () => {
+        modal.remove();
+    });
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
 }
 
-// Экспортируем ключевые функции
-window.getCurrentUser = getCurrentUser;
-window.updateUI = updateUI;
-window.showMainMenu = function() {
-    document.getElementById('game-container').style.display = 'none';
-    document.querySelector('.main-menu').style.display = 'flex';
-    updateUI();
-};
+// Пополнение картой
+function showCardDepositModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h2><i class="fas fa-credit-card"></i> Пополнение картой</h2>
+            
+            <div class="card-deposit-content">
+                <div class="amount-selection">
+                    <h3>Выберите сумму:</h3>
+                    <div class="amount-buttons">
+                        <button class="amount-btn" data-amount="10">10 USD</button>
+                        <button class="amount-btn" data-amount="50">50 USD</button>
+                        <button class="amount-btn" data-amount="100">100 USD</button>
+                        <button class="amount-btn" data-amount="500">500 USD</button>
+                    </div>
+                    <input type="number" placeholder="Другая сумма" min="1" id="cardAmount">
+                </div>
+                
+                <div class="payment-info">
+                    <p>Комиссия: 3%</p>
+                    <p>Минимальная сумма: 1 USD</p>
+                    <p>Зачисление: моментально</p>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-primary" id="processCardPayment">Пополнить</button>
+                <button class="btn-secondary" id="closeCard">Отмена</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    
+    let selectedAmount = 0;
+    
+    // Выбор суммы
+    modal.querySelectorAll('.amount-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            modal.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            selectedAmount = parseInt(e.target.dataset.amount);
+            modal.querySelector('#cardAmount').value = '';
+        });
+    });
+    
+    // Пользовательская сумма
+    modal.querySelector('#cardAmount').addEventListener('input', (e) => {
+        modal.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('active'));
+        selectedAmount = parseInt(e.target.value) || 0;
+    });
+    
+    // Обработка платежа
+    modal.querySelector('#processCardPayment').addEventListener('click', ()
