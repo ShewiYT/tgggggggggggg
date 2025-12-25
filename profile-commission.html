@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Динамика комиссий | Профиль</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <button class="btn-icon" onclick="window.history.back()">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1>Динамика комиссий</h1>
+            <div></div>
+        </header>
+
+        <main class="profile-content">
+            <div class="user-summary">
+                <div class="user-avatar-large">
+                    <i class="fas fa-user" id="profileAvatar"></i>
+                </div>
+                <div class="user-info-large">
+                    <h2 id="profileUsername">Игрок</h2>
+                    <div class="user-stats">
+                        <div class="user-stat">
+                            <div class="stat-label">Всего комиссии</div>
+                            <div class="stat-value" id="totalCommissionPaid">0</div>
+                        </div>
+                        <div class="user-stat">
+                            <div class="stat-label">Игр с комиссией</div>
+                            <div class="stat-value" id="gamesWithCommission">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3><i class="fas fa-chart-line"></i> Динамика уплаченной комиссии</h3>
+                <canvas id="commissionTrendChart"></canvas>
+            </div>
+
+            <div class="info-card">
+                <h4><i class="fas fa-info-circle"></i> Как работает комиссия?</h4>
+                <p style="margin-top: 8px; color: var(--text-secondary);">
+                    Комиссия 5% взимается только при выполнении всех условий:<br>
+                    • Игра на реальном балансе<br>
+                    • Вы выиграли игру<br>
+                    • Ваш противник - не бот<br>
+                    <br>
+                    <strong>Формула расчёта:</strong><br>
+                    Выигрыш = (ставка × 2) × 0,95<br>
+                    Комиссия = (ставка × 2) × 0,05
+                </p>
+            </div>
+
+            <div class="history-section">
+                <h3><i class="fas fa-history"></i> История комиссий</h3>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Сумма ставки</th>
+                                <th>Комиссия</th>
+                                <th>Режим</th>
+                                <th>Чистый выигрыш</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userCommissionHistory">
+                            <!-- История загружается динамически -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="actions" style="margin-top: 20px;">
+                <button class="btn-primary" onclick="window.location.href='profile.html'">
+                    <i class="fas fa-arrow-left"></i> Назад в профиль
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script src="storage.js"></script>
+    <script src="auth.js"></script>
+    <script src="commission.js"></script>
+    <script>
+        // Загрузка данных пользователя
+        document.addEventListener('DOMContentLoaded', function() {
+            const user = getCurrentUser();
+            if (!user) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            loadUserProfile(user);
+            loadCommissionData(user);
+            initCommissionChart(user);
+        });
+        
+        // Загрузка профиля пользователя
+        function loadUserProfile(user) {
+            document.getElementById('profileUsername').textContent = user.username || 'Игрок';
+            
+            // Устанавливаем аватар
+            const avatar = document.getElementById('profileAvatar');
+            if (user.avatar) {
+                avatar.innerHTML = `<img src="${user.avatar}" alt="Аватар">`;
+            }
+        }
+        
+        // Загрузка данных комиссий
+        function loadCommissionData(user) {
+            // Общая сумма комиссий
+            const totalCommission = user.totalCommissionPaid || 0;
+            document.getElementById('totalCommissionPaid').textContent = totalCommission.toFixed(2);
+            
+            // Количество игр с комиссией
+            const gamesWithCommission = user.commissionHistory ? user.commissionHistory.length : 0;
+            document.getElementById('gamesWithCommission').textContent = gamesWithCommission;
+            
+            // Загрузка истории комиссий
+            loadUserCommissionHistory(user);
+        }
+        
+        // Загрузка истории комиссий пользователя
+        function loadUserCommissionHistory(user) {
+            const tbody = document.getElementById('userCommissionHistory');
+            tbody.innerHTML = '';
+            
+            if (!user.commissionHistory || user.commissionHistory.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                        <p>Нет данных о комиссиях</p>
+                    </td>
+                `;
+                tbody.appendChild(row);
+                return;
+            }
+            
+            // Сортируем по дате (новые сначала)
+            const sortedHistory = [...user.commissionHistory].sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+            
+            sortedHistory.forEach(record => {
+                const date = new Date(record.timestamp);
+                const row = document.createElement('tr');
+                
+                // Рассчитываем чистый выигрыш (предполагаем, что ставка была такой же)
+                const estimatedStake = record.amount / 0.1; // commission = stake * 2 * 0.05 = stake * 0.1
+                const netWin = estimatedStake * 2 * 0.95;
+                
+                row.innerHTML = `
+                    <td>${date.toLocaleDateString()}<br><small>${date.toLocaleTimeString()}</small></td>
+                    <td>${estimatedStake.toFixed(2)}</td>
+                    <td class="commission-cell">${record.amount.toFixed(2)}</td>
+                    <td>Онлайн игра</td>
+                    <td class="net-win">${netWin.toFixed(2)}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Инициализация графика комиссий
+        function initCommissionChart(user) {
+            const trendData = getUserCommissionTrend(user.id);
+            
+            if (trendData.length === 0) {
+                document.getElementById('commissionTrendChart').parentElement.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        <i class="fas fa-chart-line" style="font-size: 48px; margin-bottom: 16px; display: block; opacity: 0.5;"></i>
+                        <p>Недостаточно данных для построения графика</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const dates = trendData.map(item => {
+                const date = new Date(item.date);
+                return date.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' });
+            });
+            
+            const amounts = trendData.map(item => item.amount);
+            
+            const ctx = document.getElementById('commissionTrendChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Сумма комиссии',
+                        data: amounts,
+                        borderColor: '#FF6B35',
+                        backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Комиссия: ${context.parsed.y.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Сумма комиссии'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(2);
+                                }
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Дата'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+    
+    <style>
+        .user-summary {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: var(--bg-card);
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        
+        .user-avatar-large {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            overflow: hidden;
+        }
+        
+        .user-avatar-large img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .user-info-large h2 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .user-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+        
+        .user-stat {
+            text-align: center;
+        }
+        
+        .user-stat .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        
+        .user-stat .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        
+        .chart-container {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        
+        .chart-container h3 {
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .info-card {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .info-card h4 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .history-section {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: var(--border-radius);
+        }
+        
+        .history-section h3 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .commission-cell {
+            color: var(--warning-color);
+            font-weight: 600;
+        }
+        
+        .net-win {
+            color: var(--success-color);
+            font-weight: 600;
+        }
+    </style>
+</body>
+</html>

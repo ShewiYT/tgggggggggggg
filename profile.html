@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль | Крестики-нолики</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <button class="btn-icon" onclick="window.location.href='index.html'">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1>Мой профиль</h1>
+            <button class="btn-icon" onclick="logout()" title="Выйти">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </header>
+
+        <div class="profile-content">
+            <!-- Аватар и основная информация -->
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    <i class="fas fa-user" id="profileAvatarIcon"></i>
+                </div>
+                <div class="profile-info">
+                    <h2 id="profileUsername">Загрузка...</h2>
+                    <div class="profile-stats">
+                        <div class="stat-item">
+                            <div class="stat-value" id="totalGamesStat">0</div>
+                            <div class="stat-label">Игр</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="totalWinsStat">0</div>
+                            <div class="stat-label">Побед</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="winRateStat">0%</div>
+                            <div class="stat-label">Процент побед</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Балансы -->
+            <div class="balances-card">
+                <h3><i class="fas fa-wallet"></i> Мои балансы</h3>
+                <div class="balance-row">
+                    <div class="balance-type">
+                        <i class="fas fa-gamepad"></i>
+                        <div>
+                            <div class="balance-label">Игровой баланс</div>
+                            <div class="balance-amount" id="gameBalanceProfile">0</div>
+                        </div>
+                    </div>
+                    <button class="btn-small" onclick="showDepositModal('game')">
+                        <i class="fas fa-plus"></i> Пополнить
+                    </button>
+                </div>
+                
+                <div class="balance-row">
+                    <div class="balance-type">
+                        <i class="fas fa-coins"></i>
+                        <div>
+                            <div class="balance-label">Реальный баланс</div>
+                            <div class="balance-amount" id="realBalanceProfile">0.00 USD</div>
+                        </div>
+                    </div>
+                    <button class="btn-small" onclick="showDepositModal('real')">
+                        <i class="fas fa-plus"></i> Пополнить
+                    </button>
+                </div>
+            </div>
+
+            <!-- Быстрые действия -->
+            <div class="quick-actions">
+                <button class="quick-action" onclick="window.location.href='profile-commission.html'">
+                    <i class="fas fa-percentage"></i>
+                    <span>Комиссии</span>
+                </button>
+                <button class="quick-action" onclick="showHistory()">
+                    <i class="fas fa-history"></i>
+                    <span>История</span>
+                </button>
+                <button class="quick-action" onclick="showReferral()">
+                    <i class="fas fa-user-friends"></i>
+                    <span>Рефералы</span>
+                </button>
+                <button class="quick-action" onclick="showSettings()">
+                    <i class="fas fa-cog"></i>
+                    <span>Настройки</span>
+                </button>
+            </div>
+
+            <!-- Статистика -->
+            <div class="stats-section">
+                <h3><i class="fas fa-chart-bar"></i> Статистика игр</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="gamesToday">0</div>
+                        <div class="stat-label">Игр сегодня</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="gamesWeek">0</div>
+                        <div class="stat-label">Игр за неделю</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalStake">0</div>
+                        <div class="stat-label">Всего ставок</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalCommission">0</div>
+                        <div class="stat-label">Комиссия</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Последние игры -->
+            <div class="recent-games">
+                <h3><i class="fas fa-clock"></i> Последние игры</h3>
+                <div id="recentGamesList">
+                    <!-- Игры загружаются динамически -->
+                </div>
+                <button class="btn-outline" onclick="showAllGames()" style="width: 100%; margin-top: 16px;">
+                    <i class="fas fa-list"></i> Вся история игр
+                </button>
+            </div>
+
+            <!-- Достижения -->
+            <div class="achievements">
+                <h3><i class="fas fa-trophy"></i> Достижения</h3>
+                <div class="achievements-grid" id="achievementsList">
+                    <!-- Достижения загружаются динамически -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="storage.js"></script>
+    <script src="auth.js"></script>
+    <script src="commission.js"></script>
+    <script>
+        // Загрузка профиля
+        document.addEventListener('DOMContentLoaded', function() {
+            const user = getCurrentUser();
+            if (!user) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            loadProfile(user);
+            loadStatistics(user);
+            loadRecentGames(user);
+            loadAchievements(user);
+        });
+        
+        function loadProfile(user) {
+            // Основная информация
+            document.getElementById('profileUsername').textContent = user.username || 'Игрок';
+            
+            // Аватар (если есть в Telegram)
+            if (window.Telegram && Telegram.WebApp) {
+                const tgUser = Telegram.WebApp.initDataUnsafe?.user;
+                if (tgUser && tgUser.photo_url) {
+                    const avatarIcon = document.getElementById('profileAvatarIcon');
+                    avatarIcon.innerHTML = `<img src="${tgUser.photo_url}" alt="Аватар" style="width: 100%; height: 100%; border-radius: 50%;">`;
+                }
+            }
+            
+            // Статистика
+            document.getElementById('totalGamesStat').textContent = user.totalGames || 0;
+            document.getElementById('totalWinsStat').textContent = user.totalWins || 0;
+            
+            const winRate = user.totalGames > 0 ? Math.round((user.totalWins || 0) / user.totalGames * 100) : 0;
+            document.getElementById('winRateStat').textContent = winRate + '%';
+            
+            // Балансы
+            document.getElementById('gameBalanceProfile').textContent = user.gameBalance || 0;
+            document.getElementById('realBalanceProfile').textContent = (user.realBalance || 0).toFixed(2) + ' USD';
+        }
+        
+        function loadStatistics(user) {
+            const games = getUserGames(user.id);
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            
+            // Игры сегодня
+            const gamesToday = games.filter(game => 
+                new Date(game.timestamp) > today
+            ).length;
+            document.getElementById('gamesToday').textContent = gamesToday;
+            
+            // Игры за неделю
+            const gamesWeek = games.filter(game => 
+                new Date(game.timestamp) > weekAgo
+            ).length;
+            document.getElementById('gamesWeek').textContent = gamesWeek;
+            
+            // Всего ставок
+            const totalStake = games.reduce((sum, game) => sum + (game.stake || 0), 0);
+            document.getElementById('totalStake').textContent = totalStake;
+            
+            // Комиссия
+            document.getElementById('totalCommission').textContent = (user.totalCommissionPaid || 0).toFixed(2);
+        }
+        
+        function loadRecentGames(user) {
+            const games = getUserGames(user.id);
+            const container = document.getElementById('recentGamesList');
+            
+            // Берем последние 5 игр
+            const recentGames = games.slice(-5).reverse();
+            
+            if (recentGames.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-gamepad" style="font-size: 48px; opacity: 0.5; margin-bottom: 16px;"></i>
+                        <p>Вы ещё не сыграли ни одной игры</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = recentGames.map(game => `
+                <div class="game-history-item">
+                    <div class="game-result-icon">
+                        <i class="fas fa-${game.result === 'win' ? 'trophy' : game.result === 'lose' ? 'times' : 'handshake'} ${game.result}"></i>
+                    </div>
+                    <div class="game-info">
+                        <div class="game-mode">${getGameModeName(game.mode)}</div>
+                        <div class="game-time">${new Date(game.timestamp).toLocaleDateString()}</div>
+                    </div>
+                    <div class="game-stake ${game.result}">
+                        ${game.result === 'win' ? '+' : game.result === 'lose' ? '-' : '±'}${game.stake || 0}
+                        ${game.balanceType === 'game' ? 'игр.' : 'USD'}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function getGameModeName(mode) {
+            const modes = {
+                'bot': 'С ботом',
+                'online': 'Онлайн',
+                'private': 'Лобби',
+                'quick': 'Быстрая игра'
+            };
+            return modes[mode] || mode;
+        }
+        
+        function loadAchievements(user) {
+            const games = getUserGames(user.id);
+            const container = document.getElementById('achievementsList');
+            
+            const achievements = [
+                {
+                    id: 'first_game',
+                    title: 'Первая игра',
+                    icon: 'fa-play',
+                    condition: games.length >= 1,
+                    description: 'Сыграть первую игру'
+                },
+                {
+                    id: 'first_win',
+                    title: 'Первая победа',
+                    icon: 'fa-trophy',
+                    condition: (user.totalWins || 0) >= 1,
+                    description: 'Одержать первую победу'
+                },
+                {
+                    id: 'ten_games',
+                    title: 'Опытный игрок',
+                    icon: 'fa-gamepad',
+                    condition: games.length >= 10,
+                    description: 'Сыграть 10 игр'
+                },
+                {
+                    id: 'win_streak',
+                    title: 'Серия побед',
+                    icon: 'fa-fire',
+                    condition: checkWinStreak(games) >= 3,
+                    description: 'Выиграть 3 игры подряд'
+                },
+                {
+                    id: 'big_bet',
+                    title: 'Крупная ставка',
+                    icon: 'fa-gem',
+                    condition: games.some(g => g.stake >= 100),
+                    description: 'Сделать ставку от 100'
+                },
+                {
+                    id: 'bot_master',
+                    title: 'Повелитель ботов',
+                    icon: 'fa-robot',
+                    condition: games.filter(g => g.mode === 'bot' && g.result === 'win').length >= 5,
+                    description: 'Победить бота 5 раз'
+                }
+            ];
+            
+            const unlocked = achievements.filter(a => a.condition);
+            const locked = achievements.filter(a => !a.condition);
+            
+            let html = '';
+            
+            // Разблокированные достижения
+            unlocked.forEach(achievement => {
+                html += `
+                    <div class="achievement unlocked">
+                        <div class="achievement-icon">
+                            <i class="fas ${achievement.icon}"></i>
+                        </div>
+                        <div class="achievement-info">
+                            <div class="achievement-title">${achievement.title}</div>
+                            <div class="achievement-desc">${achievement.description}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // Заблокированные достижения
+            locked.forEach(achievement => {
+                html += `
+                    <div class="achievement locked">
+                        <div class="achievement-icon">
+                            <i class="fas ${achievement.icon}"></i>
+                            <div class="achievement-lock"><i class="fas fa-lock"></i></div>
+                        </div>
+                        <div class="achievement-info">
+                            <div class="achievement-title">???</div>
+                            <div class="achievement-desc">Скрыто</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html || '<p>Нет достижений</p>';
+        }
+        
+        function checkWinStreak(games) {
+            let streak = 0;
+            // Проверяем последние игры (новые первыми)
+            const recentGames = [...games].reverse();
+            
+            for (const game of recentGames) {
+                if (game.result === 'win') {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+            
+            return streak;
+        }
+        
+        function showDepositModal(type) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            
+            const isGame = type === 'game';
+            const title = isGame ? 'Пополнение игрового баланса' : 'Пополнение реального баланса';
+            
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h2>${title}</h2>
+                    <div style="margin: 20px 0;">
+                        <p style="color: var(--text-secondary); margin-bottom: 16px;">Выберите сумму:</p>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                            ${isGame ? 
+                                ['100', '500', '1000', '5000', '10000', '50000'].map(amount => `
+                                    <button class="amount-btn" data-amount="${amount}">${amount}</button>
+                                `).join('') :
+                                ['10', '50', '100', '500', '1000', '5000'].map(amount => `
+                                    <button class="amount-btn" data-amount="${amount}">${amount} USD</button>
+                                `).join('')
+                            }
+                            <input type="number" id="customAmount" placeholder="Другая сумма" style="grid-column: span 3; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--text-primary);">
+                        </div>
+                    </div>
+                    ${!isGame ? `
+                        <div style="margin: 20px 0; padding: 16px; background: rgba(255, 107, 53, 0.1); border-radius: var(--border-radius-sm);">
+                            <p style="color: var(--warning-color); margin-bottom: 8px;">
+                                <i class="fas fa-info-circle"></i> В тестовом режиме пополнение не требует реальных платежей
+                            </p>
+                            <p style="font-size: 14px; color: var(--text-secondary);">
+                                Для тестирования просто выберите сумму - она будет добавлена на баланс
+                            </p>
+                        </div>
+                    ` : ''}
+                    <div class="modal-actions">
+                        <button class="btn-secondary" id="cancelDeposit">Отмена</button>
+                        <button class="btn-primary" id="confirmDeposit">Пополнить</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            let selectedAmount = 0;
+            
+            // Обработчики кнопок суммы
+            modal.querySelectorAll('.amount-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    modal.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    selectedAmount = parseInt(this.dataset.amount);
+                    document.getElementById('customAmount').value = '';
+                });
+            });
+            
+            // Обработчик кастомной суммы
+            document.getElementById('customAmount').addEventListener('input', function() {
+                modal.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('active'));
+                selectedAmount = parseInt(this.value) || 0;
+            });
+            
+            modal.querySelector('#cancelDeposit').addEventListener('click', function() {
+                modal.remove();
+            });
+            
+            modal.querySelector('#confirmDeposit').addEventListener('click', function() {
+                if (selectedAmount <= 0) {
+                    showNotification('Выберите сумму для пополнения', 'error');
+                    return;
+                }
+                
+                const user = getCurrentUser();
+                if (isGame) {
+                    user.gameBalance = (user.gameBalance || 0) + selectedAmount;
+                } else {
+                    user.realBalance = (user.realBalance || 0) + selectedAmount;
+                }
+                
+                updateUser(user);
+                loadProfile(user);
+                
+                // Сохраняем транзакцию
+                saveTransaction({
+                    userId: user.id,
+                    type: 'deposit',
+                    amount: selectedAmount,
+                    balanceType: isGame ? 'game' : 'real',
+                    status: 'completed'
+                });
+                
+                showNotification(`Баланс пополнен на ${selectedAmount} ${isGame ? 'монет' : 'USD'}!`, 'success');
+                modal.remove();
+            });
+        }
+        
+        function showHistory() {
+            const user = getCurrentUser();
+            const games = getUserGames(user.id);
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h2>История игр</h2>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        ${games.length === 0 ? 
+                            '<p style="text-align: center; padding: 40px;">Нет сыгранных игр</p>' : 
+                            games.slice().reverse().map(game => `
+                                <div class="history-item">
+                                    <div class="history-game">
+                                        <div class="history-result ${game.result}">
+                                            <i class="fas fa-${game.result === 'win' ? 'trophy' : game.result === 'lose' ? 'times' : 'handshake'}"></i>
+                                            <span>${game.result === 'win' ? 'Победа' : game.result === 'lose' ? 'Проигрыш' : 'Ничья'}</span>
+                                        </div>
+                                        <div class="history-info">
+                                            <div>${getGameModeName(game.mode)}</div>
+                                            <div class="history-time">${new Date(game.timestamp).toLocaleString()}</div>
+                                        </div>
+                                    </div>
+                                    <div class="history-amount ${game.result}">
+                                        ${game.result === 'win' ? '+' : game.result === 'lose' ? '-' : ''}${game.stake || 0}
+                                        ${game.balanceType === 'game' ? 'игр.' : 'USD'}
+                                        ${game.commission ? `<div class="history-commission">-${game.commission} комиссия</div>` : ''}
+                                    </div>
+                                </div>
+                            `).join('')
+                        }
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn-primary" id="closeHistory">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            modal.querySelector('#closeHistory').addEventListener('click', function() {
+                modal.remove();
+            });
+        }
+        
+        function showReferral() {
+            const user = getCurrentUser();
+            const referralCode = btoa(user.id.toString()).slice(0, 8);
+            const referralLink = `https://t.me/your_bot?start=${referralCode}`;
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h2>Реферальная программа</h2>
+                    <div style="margin: 20px 0;">
+                        <p style="color: var(--text-secondary); margin-bottom: 12px;">Приглашайте друзей и получайте бонусы!</p>
+                        
+                        <div style="background: var(--bg-secondary); padding: 16px; border-radius: var(--border-radius-sm); margin-bottom: 20px;">
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Ваша реферальная ссылка:</div>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="referralLink" value="${referralLink}" readonly style="flex: 1; padding: 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--text-primary);">
+                                <button class="btn-primary" onclick="copyReferralLink()">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div style="background: var(--bg-secondary); padding: 16px; border-radius: var(--border-radius-sm);">
+                            <h4 style="margin-bottom: 12px;">Условия программы:</h4>
+                            <ul style="color: var(--text-secondary); padding-left: 20px;">
+                                <li>За каждого приглашенного: 10% от его первой ставки</li>
+                                <li>Бонус за активного реферала: 5% от его выигрышей</li>
+                                <li>Реферал должен сделать минимум 1 ставку</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn-primary" id="closeReferral">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            modal.querySelector('#closeReferral').addEventListener('click', function() {
+                modal.remove();
+            });
+        }
+        
+        function copyReferralLink() {
+            const link = document.getElementById('referralLink');
+            link.select();
+            document.execCommand('copy');
+            showNotification('Ссылка скопирована в буфер обмена!', 'success');
+        }
+        
+        function showSettings() {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h2>Настройки</h2>
+                    <div style="margin: 20px 0;">
+                        <div class="setting-option">
+                            <label>
+                                <input type="checkbox" id="soundEnabled" checked>
+                                Звуковые эффекты
+                            </label>
+                        </div>
+                        <div class="setting-option">
+                            <label>
+                                <input type="checkbox" id="notificationsEnabled" checked>
+                                Уведомления
+                            </label>
+                        </div>
+                        <div class="setting-option">
+                            <label>
+                                <input type="checkbox" id="showCommissionNotice" checked>
+                                Показывать предупреждение о комиссии
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn-secondary" id="cancelSettings">Отмена</button>
+                        <button class="btn-primary" id="saveSettings">Сохранить</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Загружаем сохраненные настройки
+            const settings = JSON.parse(localStorage.getItem('userSettings') || '{}');
+            document.getElementById('soundEnabled').checked = settings.soundEnabled !== false;
+            document.getElementById('notificationsEnabled').checked = settings.notificationsEnabled !== false;
+            document.getElementById('showCommissionNotice').checked = settings.showCommissionNotice !== false;
+            
+            modal.querySelector('#cancelSettings').addEventListener('click', function() {
+                modal.remove();
+            });
+            
+            modal.querySelector('#saveSettings').addEventListener('click', function() {
+                const newSettings = {
+                    soundEnabled: document.getElementById('soundEnabled').checked,
+                    notificationsEnabled: document.getElementById('notificationsEnabled').checked,
+                    showCommissionNotice: document.getElementById('showCommissionNotice').checked
+                };
+                
+                localStorage.setItem('userSettings', JSON.stringify(newSettings));
+                showNotification('Настройки сохранены', 'success');
+                modal.remove();
+            });
+        }
+        
+        function showAllGames() {
+            // Перенаправляем на отдельную страницу или показываем расширенный список
+            showHistory();
+        }
+        
+        function logout() {
+            if (confirm('Вы уверены что хотите выйти?')) {
+                localStorage.removeItem('currentUserId');
+                window.location.href = 'index.html';
+            }
+        }
+        
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 10);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+    </script>
+    
+    <style>
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 24px;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            color: white;
+        }
+        
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            overflow: hidden;
+        }
+        
+        .profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .profile-info h2 {
+            margin-bottom: 12px;
+            font-size: 24px;
+        }
+        
+        .profile-stats {
+            display: flex;
+            gap: 24px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-item .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .stat-item .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .balances-card {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        
+        .balances-card h3 {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .balance-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .balance-row:last-child {
+            border-bottom: none;
+        }
+        
+        .balance-type {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .balance-type i {
+            font-size: 24px;
+            color: var(--primary-color);
+        }
+        
+        .balance-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .balance-amount {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+        
+        .btn-small {
+            padding: 8px 16px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius-sm);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn-small:hover {
+            opacity: 0.9;
+        }
+        
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .quick-action {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .quick-action:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+        
+        .quick-action i {
+            font-size: 24px;
+            color: var(--primary-color);
+        }
+        
+        .stats-section {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        
+        .stats-section h3 {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .recent-games {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        
+        .recent-games h3 {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .game-history-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .game-history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .game-result-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        
+        .game-result-icon .win {
+            color: var(--success-color);
+            background: rgba(76, 175, 80, 0.1);
+        }
+        
+        .game-result-icon .lose {
+            color: var(--danger-color);
+            background: rgba(244, 67, 54, 0.1);
+        }
+        
+        .game-result-icon .draw {
+            color: var(--warning-color);
+            background: rgba(255, 152, 0, 0.1);
+        }
+        
+        .game-info {
+            flex: 1;
+        }
+        
+        .game-mode {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .game-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .game-stake {
+            font-weight: 700;
+            font-size: 18px;
+        }
+        
+        .game-stake.win {
+            color: var(--success-color);
+        }
+        
+        .game-stake.lose {
+            color: var(--danger-color);
+        }
+        
+        .game-stake.draw {
+            color: var(--warning-color);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+        
+        .achievements {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: var(--border-radius);
+        }
+        
+        .achievements h3 {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .achievements-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        
+        .achievement {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius-sm);
+        }
+        
+        .achievement.unlocked {
+            border: 2px solid var(--success-color);
+        }
+        
+        .achievement.locked {
+            opacity: 0.6;
+        }
+        
+        .achievement-icon {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+        }
+        
+        .achievement-lock {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: var(--danger-color);
+            color: white;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+        
+        .achievement-info {
+            flex: 1;
+        }
+        
+        .achievement-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .achievement-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .history-game {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .history-result {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .history-result.win {
+            background: rgba(76, 175, 80, 0.2);
+            color: var(--success-color);
+        }
+        
+        .history-result.lose {
+            background: rgba(244, 67, 54, 0.2);
+            color: var(--danger-color);
+        }
+        
+        .history-result.draw {
+            background: rgba(255, 152, 0, 0.2);
+            color: var(--warning-color);
+        }
+        
+        .history-info {
+            font-size: 14px;
+        }
+        
+        .history-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        
+        .history-amount {
+            font-weight: 700;
+            text-align: right;
+        }
+        
+        .history-amount.win {
+            color: var(--success-color);
+        }
+        
+        .history-amount.lose {
+            color: var(--danger-color);
+        }
+        
+        .history-commission {
+            font-size: 12px;
+            color: var(--warning-color);
+            margin-top: 4px;
+        }
+        
+        .setting-option {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .setting-option:last-child {
+            border-bottom: none;
+        }
+        
+        .setting-option label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+    </style>
+</body>
+</html>

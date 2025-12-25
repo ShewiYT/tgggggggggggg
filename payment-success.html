@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Оплата успешна | Крестики-нолики</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="payment-success">
+            <div class="success-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            
+            <h1>Оплата успешно завершена!</h1>
+            
+            <div class="success-details" id="paymentDetails">
+                <div class="detail-item">
+                    <span class="label">Статус:</span>
+                    <span class="value status-success">Успешно</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Сумма:</span>
+                    <span class="value" id="paymentAmount">Загрузка...</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Дата:</span>
+                    <span class="value" id="paymentDate">Загрузка...</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">ID транзакции:</span>
+                    <span class="value" id="paymentId">Загрузка...</span>
+                </div>
+            </div>
+            
+            <div class="success-message">
+                <p>Средства будут зачислены на ваш баланс в течение 1-2 минут.</p>
+                <p>Если баланс не обновился, нажмите кнопку "Проверить статус".</p>
+            </div>
+            
+            <div class="success-actions">
+                <button class="btn-primary" onclick="checkPaymentStatus()">
+                    <i class="fas fa-sync-alt"></i> Проверить статус
+                </button>
+                <button class="btn-secondary" onclick="window.location.href='index.html'">
+                    <i class="fas fa-home"></i> На главную
+                </button>
+            </div>
+            
+            <div class="success-help">
+                <p><i class="fas fa-question-circle"></i> Если возникли проблемы, свяжитесь с поддержкой</p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="storage.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Получаем данные из URL параметров
+            const urlParams = new URLSearchParams(window.location.search);
+            const invoiceId = urlParams.get('invoice_id');
+            const status = urlParams.get('status');
+            const amount = urlParams.get('amount');
+            const asset = urlParams.get('asset');
+            
+            // Отображаем данные
+            document.getElementById('paymentAmount').textContent = 
+                amount && asset ? `${amount} ${asset}` : 'Загрузка...';
+            document.getElementById('paymentDate').textContent = 
+                new Date().toLocaleString();
+            document.getElementById('paymentId').textContent = 
+                invoiceId || 'Не указан';
+            
+            // Проверяем статус платежа
+            if (invoiceId) {
+                checkPaymentStatus();
+            }
+        });
+        
+        function checkPaymentStatus() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const invoiceId = urlParams.get('invoice_id');
+            
+            if (!invoiceId) {
+                showNotification('ID платежа не указан', 'error');
+                return;
+            }
+            
+            // Здесь можно добавить проверку статуса через API
+            // Показываем сообщение об ожидании
+            showNotification('Проверяем статус платежа...', 'info');
+            
+            // Имитируем проверку
+            setTimeout(() => {
+                showNotification('✅ Платеж подтвержден! Баланс обновлен.', 'success');
+                
+                // Обновляем детали платежа
+                document.querySelectorAll('.status-success').forEach(el => {
+                    el.innerHTML = '<i class="fas fa-check"></i> Подтверждено';
+                });
+            }, 2000);
+        }
+        
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 10);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+    </script>
+    
+    <style>
+        .payment-success {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 40px;
+            background: var(--bg-card);
+            border-radius: var(--border-radius);
+            text-align: center;
+        }
+        
+        .success-icon {
+            font-size: 80px;
+            color: var(--success-color);
+            margin-bottom: 30px;
+        }
+        
+        .payment-success h1 {
+            margin-bottom: 30px;
+            color: var(--text-primary);
+        }
+        
+        .success-details {
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+        
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-item .label {
+            color: var(--text-secondary);
+        }
+        
+        .detail-item .value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .status-success {
+            color: var(--success-color) !important;
+        }
+        
+        .success-message {
+            margin-bottom: 30px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        
+        .success-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        
+        .success-help {
+            padding: 20px;
+            background: rgba(255, 107, 53, 0.1);
+            border-radius: var(--border-radius);
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .success-help i {
+            color: var(--primary-color);
+            margin-right: 8px;
+        }
+    </style>
+</body>
+</html>

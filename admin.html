@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель | Крестики-нолики</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <button class="btn-icon" onclick="window.location.href='index.html'">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1>Админ-панель</h1>
+            <div class="admin-info">
+                <span id="adminUsername"></span>
+            </div>
+        </header>
+
+        <div class="admin-panel">
+            <div class="admin-tabs">
+                <button class="tab-btn active" onclick="showTab('dashboard')">
+                    <i class="fas fa-chart-line"></i> Дашборд
+                </button>
+                <button class="tab-btn" onclick="showTab('users')">
+                    <i class="fas fa-users"></i> Пользователи
+                </button>
+                <button class="tab-btn" onclick="showTab('games')">
+                    <i class="fas fa-gamepad"></i> Игры
+                </button>
+                <button class="tab-btn" onclick="showTab('transactions')">
+                    <i class="fas fa-exchange-alt"></i> Транзакции
+                </button>
+                <button class="tab-btn" onclick="showTab('commission')">
+                    <i class="fas fa-percentage"></i> Комиссии
+                </button>
+                <button class="tab-btn" onclick="showTab('settings')">
+                    <i class="fas fa-cog"></i> Настройки
+                </button>
+            </div>
+
+            <div class="admin-content">
+                <!-- Дашборд -->
+                <div id="dashboardTab" class="tab-content">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalUsers">0</div>
+                            <div class="stat-label">Пользователей</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalGames">0</div>
+                            <div class="stat-label">Игр сыграно</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalBets">0</div>
+                            <div class="stat-label">Всего ставок</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalCommission">0</div>
+                            <div class="stat-label">Комиссия</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 30px;">
+                        <h3>Последние активности</h3>
+                        <div id="recentActivities" class="activities-list">
+                            <!-- Активности загружаются динамически -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Пользователи -->
+                <div id="usersTab" class="tab-content" style="display: none;">
+                    <div class="search-box" style="margin-bottom: 20px;">
+                        <input type="text" id="searchUser" placeholder="Поиск пользователя..." style="width: 100%; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius); color: var(--text-primary);">
+                    </div>
+                    
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Имя</th>
+                                    <th>Баланс</th>
+                                    <th>Игр</th>
+                                    <th>Побед</th>
+                                    <th>Дата регистрации</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTable">
+                                <!-- Пользователи загружаются динамически -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Игры -->
+                <div id="gamesTab" class="tab-content" style="display: none;">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Игроки</th>
+                                    <th>Ставка</th>
+                                    <th>Результат</th>
+                                    <th>Время</th>
+                                    <th>Комиссия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gamesTable">
+                                <!-- Игры загружаются динамически -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Комиссии -->
+                <div id="commissionTab" class="tab-content" style="display: none;">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="commissionTotal">0</div>
+                            <div class="stat-label">Всего комиссии</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="commissionToday">0</div>
+                            <div class="stat-label">Сегодня</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="commissionWeek">0</div>
+                            <div class="stat-label">За неделю</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="commissionMonth">0</div>
+                            <div class="stat-label">За месяц</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 30px;">
+                        <button class="btn-primary" onclick="window.location.href='admin-commission.html'">
+                            <i class="fas fa-chart-pie"></i> Подробная статистика комиссий
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Настройки -->
+                <div id="settingsTab" class="tab-content" style="display: none;">
+                    <div class="settings-section">
+                        <h3>Настройки системы</h3>
+                        
+                        <div class="setting-item">
+                            <label>Стартовый баланс (игровой):</label>
+                            <input type="number" id="startGameBalance" value="100" style="width: 100px; padding: 8px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--text-primary);">
+                            <button class="btn-secondary" onclick="updateStartBalance()">Сохранить</button>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label>Размер комиссии (%):</label>
+                            <input type="number" id="commissionRate" value="5" min="0" max="50" style="width: 100px; padding: 8px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--text-primary);">
+                            <button class="btn-secondary" onclick="updateCommissionRate()">Сохранить</button>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label>Минимальная ставка:</label>
+                            <input type="number" id="minBet" value="1" min="1" style="width: 100px; padding: 8px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--text-primary);">
+                            <button class="btn-secondary" onclick="updateMinBet()">Сохранить</button>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section" style="margin-top: 30px;">
+                        <h3>Опасная зона</h3>
+                        <div class="danger-zone">
+                            <button class="btn-danger" onclick="resetAllData()" style="background: var(--danger-color);">
+                                <i class="fas fa-trash"></i> Сбросить все данные
+                            </button>
+                            <button class="btn-warning" onclick="exportAllData()" style="background: var(--warning-color);">
+                                <i class="fas fa-download"></i> Экспорт всех данных
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="storage.js"></script>
+    <script src="auth.js"></script>
+    <script src="commission.js"></script>
+    <script>
+        // Проверка прав администратора
+        document.addEventListener('DOMContentLoaded', function() {
+            const user = getCurrentUser();
+            if (!user || !user.isAdmin) {
+                alert('Доступ запрещен! Требуются права администратора.');
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            // Показываем имя админа
+            document.getElementById('adminUsername').textContent = user.username;
+            
+            // Загружаем данные
+            loadDashboardData();
+            loadUsers();
+            loadGames();
+            loadCommissionData();
+            
+            // Инициализируем поиск
+            document.getElementById('searchUser').addEventListener('input', function(e) {
+                filterUsers(e.target.value);
+            });
+        });
+        
+        function showTab(tabName) {
+            // Скрываем все вкладки
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            
+            // Убираем активный класс у всех кнопок
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Показываем выбранную вкладку
+            document.getElementById(tabName + 'Tab').style.display = 'block';
+            
+            // Добавляем активный класс кнопке
+            event.target.classList.add('active');
+        }
+        
+        function loadDashboardData() {
+            const users = getUsers();
+            const games = getGames();
+            const transactions = getTransactions();
+            
+            // Статистика
+            document.getElementById('totalUsers').textContent = users.length;
+            document.getElementById('totalGames').textContent = games.length;
+            
+            const totalBets = games.reduce((sum, game) => sum + (game.stake || 0), 0);
+            document.getElementById('totalBets').textContent = totalBets;
+            
+            const commissionFund = getBotCommissionFund();
+            document.getElementById('totalCommission').textContent = commissionFund.total.toFixed(2);
+            
+            // Последние активности
+            loadRecentActivities();
+        }
+        
+        function loadRecentActivities() {
+            const games = getGames();
+            const users = getUsers();
+            const container = document.getElementById('recentActivities');
+            
+            // Берем последние 10 активностей
+            const recentGames = games.slice(-10).reverse();
+            const recentUsers = users.slice(-5).reverse();
+            
+            let html = '';
+            
+            // Последние игры
+            recentGames.forEach(game => {
+                const user = users.find(u => u.id === game.userId);
+                html += `
+                    <div class="activity-item">
+                        <i class="fas fa-gamepad"></i>
+                        <div>
+                            <strong>${user?.username || 'Игрок'}</strong> ${game.result === 'win' ? 'выиграл' : game.result === 'lose' ? 'проиграл' : 'сыграл вничью'}
+                            <div class="activity-time">${new Date(game.timestamp).toLocaleString()}</div>
+                        </div>
+                        <span class="activity-amount">${game.stake || 0}</span>
+                    </div>
+                `;
+            });
+            
+            // Последние регистрации
+            recentUsers.forEach(user => {
+                html += `
+                    <div class="activity-item">
+                        <i class="fas fa-user-plus"></i>
+                        <div>
+                            <strong>Новый пользователь:</strong> ${user.username}
+                            <div class="activity-time">${new Date(user.createdAt).toLocaleString()}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html || '<p>Нет активностей</p>';
+        }
+        
+        function loadUsers() {
+            const users = getUsers();
+            const tbody = document.getElementById('usersTable');
+            
+            tbody.innerHTML = users.map(user => `
+                <tr>
+                    <td>${user.id}</td>
+                    <td>
+                        <strong>${user.username}</strong>
+                        ${user.isAdmin ? '<span class="badge-admin">Админ</span>' : ''}
+                        ${user.isPartner ? '<span class="badge-partner">Партнёр</span>' : ''}
+                    </td>
+                    <td>
+                        <div>Игр: ${user.gameBalance || 0}</div>
+                        <div>Реал: ${user.realBalance || 0}</div>
+                    </td>
+                    <td>${user.totalGames || 0}</td>
+                    <td>${user.totalWins || 0}</td>
+                    <td>${new Date(user.createdAt || Date.now()).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn-icon" onclick="editUser(${user.id})" title="Редактировать">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-icon" onclick="viewUserDetails(${user.id})" title="Подробнее">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function filterUsers(searchTerm) {
+            const users = getUsers();
+            const filtered = users.filter(user => 
+                user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                user.id.toString().includes(searchTerm)
+            );
+            
+            const tbody = document.getElementById('usersTable');
+            tbody.innerHTML = filtered.map(user => `
+                <tr>
+                    <td>${user.id}</td>
+                    <td>${user.username}</td>
+                    <td>
+                        <div>Игр: ${user.gameBalance || 0}</div>
+                        <div>Реал: ${user.realBalance || 0}</div>
+                    </td>
+                    <td>${user.totalGames || 0}</td>
+                    <td>${user.totalWins || 0}</td>
+                    <td>${new Date(user.createdAt || Date.now()).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn-icon" onclick="editUser(${user.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function editUser(userId) {
+            const user = getUserById(userId);
+            if (!user) return;
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h2>Редактирование пользователя</h2>
+                    <div style="margin-bottom: 20px;">
+                        <label>Имя пользователя:</label>
+                        <input type="text" id="editUsername" value="${user.username}" style="width: 100%; padding: 12px; margin-top: 8px;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label>Игровой баланс:</label>
+                        <input type="number" id="editGameBalance" value="${user.gameBalance || 0}" style="width: 100%; padding: 12px; margin-top: 8px;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label>Реальный баланс:</label>
+                        <input type="number" id="editRealBalance" value="${user.realBalance || 0}" style="width: 100%; padding: 12px; margin-top: 8px;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label>
+                            <input type="checkbox" id="editIsAdmin" ${user.isAdmin ? 'checked' : ''}>
+                            Администратор
+                        </label>
+                        <label style="margin-left: 20px;">
+                            <input type="checkbox" id="editIsPartner" ${user.isPartner ? 'checked' : ''}>
+                            Партнёр
+                        </label>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn-secondary" id="cancelEdit">Отмена</button>
+                        <button class="btn-primary" id="saveEdit">Сохранить</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            modal.querySelector('#cancelEdit').addEventListener('click', function() {
+                modal.remove();
+            });
+            
+            modal.querySelector('#saveEdit').addEventListener('click', function() {
+                user.username = document.getElementById('editUsername').value;
+                user.gameBalance = parseInt(document.getElementById('editGameBalance').value) || 0;
+                user.realBalance = parseInt(document.getElementById('editRealBalance').value) || 0;
+                user.isAdmin = document.getElementById('editIsAdmin').checked;
+                user.isPartner = document.getElementById('editIsPartner').checked;
+                
+                updateUser(user);
+                loadUsers();
+                modal.remove();
+                
+                showNotification('Пользователь обновлен', 'success');
+            });
+        }
+        
+        function viewUserDetails(userId) {
+            const user = getUserById(userId);
+            if (!user) return;
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h2>Детали пользователя</h2>
+                    <div style="margin-bottom: 20px;">
+                        <strong>ID:</strong> ${user.id}<br>
+                        <strong>Имя:</strong> ${user.username}<br>
+                        <strong>Зарегистрирован:</strong> ${new Date(user.createdAt || Date.now()).toLocaleString()}<br>
+                        <strong>Роли:</strong> ${user.isAdmin ? 'Администратор' : ''} ${user.isPartner ? 'Партнёр' : ''}
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h3>Статистика игр</h3>
+                        <div>Всего игр: ${user.totalGames || 0}</div>
+                        <div>Побед: ${user.totalWins || 0}</div>
+                        <div>Проигрышей: ${(user.totalGames || 0) - (user.totalWins || 0)}</div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h3>Балансы</h3>
+                        <div>Игровой: ${user.gameBalance || 0}</div>
+                        <div>Реальный: ${user.realBalance || 0} USD</div>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button class="btn-primary" id="closeDetails">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            modal.querySelector('#closeDetails').addEventListener('click', function() {
+                modal.remove();
+            });
+        }
+        
+        function loadGames() {
+            const games = getGames();
+            const users = getUsers();
+            const tbody = document.getElementById('gamesTable');
+            
+            // Берем последние 50 игр
+            const recentGames = games.slice(-50).reverse();
+            
+            tbody.innerHTML = recentGames.map(game => {
+                const user = users.find(u => u.id === game.userId);
+                return `
+                    <tr>
+                        <td>${game.id}</td>
+                        <td>${user?.username || 'Игрок'}</td>
+                        <td>${game.stake || 0} ${game.balanceType === 'game' ? 'игр.' : 'USD'}</td>
+                        <td>
+                            <span class="game-result ${game.result}">
+                                ${game.result === 'win' ? 'Победа' : game.result === 'lose' ? 'Проигрыш' : 'Ничья'}
+                            </span>
+                        </td>
+                        <td>${new Date(game.timestamp).toLocaleTimeString()}</td>
+                        <td>${game.commission ? game.commission.toFixed(2) : '0.00'}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        function loadCommissionData() {
+            const commissionFund = getBotCommissionFund();
+            
+            document.getElementById('commissionTotal').textContent = commissionFund.total.toFixed(2);
+            document.getElementById('commissionToday').textContent = commissionFund.daily.toFixed(2);
+            document.getElementById('commissionWeek').textContent = commissionFund.weekly.toFixed(2);
+            document.getElementById('commissionMonth').textContent = commissionFund.monthly.toFixed(2);
+        }
+        
+        function updateStartBalance() {
+            const balance = parseInt(document.getElementById('startGameBalance').value) || 100;
+            localStorage.setItem('startGameBalance', balance.toString());
+            showNotification('Стартовый баланс обновлен', 'success');
+        }
+        
+        function updateCommissionRate() {
+            const rate = parseInt(document.getElementById('commissionRate').value) || 5;
+            if (rate >= 0 && rate <= 50) {
+                localStorage.setItem('commissionRate', rate.toString());
+                showNotification('Размер комиссии обновлен', 'success');
+            } else {
+                showNotification('Комиссия должна быть от 0% до 50%', 'error');
+            }
+        }
+        
+        function updateMinBet() {
+            const minBet = parseInt(document.getElementById('minBet').value) || 1;
+            if (minBet >= 1) {
+                localStorage.setItem('minBet', minBet.toString());
+                showNotification('Минимальная ставка обновлена', 'success');
+            }
+        }
+        
+        function resetAllData() {
+            if (confirm('ВНИМАНИЕ! Вы уверены что хотите сбросить ВСЕ данные? Это действие нельзя отменить.')) {
+                // Очищаем все данные
+                localStorage.removeItem('ticTacToeUsers');
+                localStorage.removeItem('ticTacToeGames');
+                localStorage.removeItem('ticTacToeTransactions');
+                localStorage.removeItem('botCommissionFund');
+                localStorage.removeItem('commissionHistory');
+                localStorage.removeItem('currentUserId');
+                
+                // Создаем администратора заново
+                const adminUser = {
+                    id: 1,
+                    username: 'KovalchukAdmin',
+                    password: '99Adidas.Shewi12011979',
+                    isAdmin: true,
+                    isPartner: true,
+                    realBalance: 10000,
+                    gameBalance: 5000,
+                    totalWins: 0,
+                    totalGames: 0,
+                    totalCommissionPaid: 0,
+                    commissionHistory: [],
+                    createdAt: new Date().toISOString()
+                };
+                
+                localStorage.setItem('ticTacToeUsers', JSON.stringify([adminUser]));
+                localStorage.setItem('currentUserId', '1');
+                
+                showNotification('Все данные сброшены. Создан администратор.', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+        }
+        
+        function exportAllData() {
+            const data = {
+                users: getUsers(),
+                games: getGames(),
+                transactions: getTransactions(),
+                commissionFund: getBotCommissionFund(),
+                commissionHistory: getCommissionHistory(),
+                exportDate: new Date().toISOString()
+            };
+            
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            a.href = url;
+            a.download = `tic-tac-toe-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('Данные экспортированы', 'success');
+        }
+        
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 10);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+    </script>
+    
+    <style>
+        .badge-admin {
+            background: var(--danger-color);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+        
+        .badge-partner {
+            background: var(--warning-color);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .activity-item i {
+            font-size: 20px;
+            color: var(--primary-color);
+        }
+        
+        .activity-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        
+        .activity-amount {
+            margin-left: auto;
+            color: var(--success-color);
+            font-weight: 600;
+        }
+        
+        .activities-list {
+            background: var(--bg-card);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+        
+        .game-result {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .game-result.win {
+            background: rgba(76, 175, 80, 0.2);
+            color: var(--success-color);
+        }
+        
+        .game-result.lose {
+            background: rgba(244, 67, 54, 0.2);
+            color: var(--danger-color);
+        }
+        
+        .game-result.draw {
+            background: rgba(255, 152, 0, 0.2);
+            color: var(--warning-color);
+        }
+        
+        .settings-section {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        
+        .setting-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .danger-zone {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        .btn-danger, .btn-warning {
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .btn-danger:hover {
+            opacity: 0.9;
+        }
+        
+        .btn-warning:hover {
+            opacity: 0.9;
+        }
+    </style>
+</body>
+</html>

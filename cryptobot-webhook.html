@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoBot Webhook</title>
+</head>
+<body>
+    <script src="storage.js"></script>
+    <script src="cryptobot.js"></script>
+    <script>
+        // Обработка webhook от CryptoBot
+        async function handleWebhook() {
+            try {
+                // Получаем данные из URL параметров
+                const urlParams = new URLSearchParams(window.location.search);
+                const eventType = urlParams.get('event_type');
+                const eventData = urlParams.get('event_data');
+                
+                if (!eventType || !eventData) {
+                    console.log('Нет данных webhook');
+                    return;
+                }
+                
+                // Парсим данные события
+                const data = JSON.parse(decodeURIComponent(eventData));
+                
+                console.log('Webhook получен:', eventType, data);
+                
+                // Обрабатываем разные типы событий
+                switch (eventType) {
+                    case 'invoice_paid':
+                        await handleInvoicePaid(data);
+                        break;
+                        
+                    case 'transfer_completed':
+                        await handleTransferCompleted(data);
+                        break;
+                        
+                    default:
+                        console.log('Неизвестный тип события:', eventType);
+                }
+                
+                // Показываем сообщение об успехе
+                document.body.innerHTML = `
+                    <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+                        <h1 style="color: #4CAF50;">✅ Webhook обработан</h1>
+                        <p>Событие: ${eventType}</p>
+                        <p>ID: ${data.invoice_id || data.transfer_id}</p>
+                        <p>Вы будете перенаправлены обратно...</p>
+                    </div>
+                `;
+                
+                // Возвращаемся на главную страницу через 3 секунды
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 3000);
+                
+            } catch (error) {
+                console.error('Ошибка обработки webhook:', error);
+                
+                document.body.innerHTML = `
+                    <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+                        <h1 style="color: #F44336;">❌ Ошибка</h1>
+                        <p>${error.message}</p>
+                        <button onclick="window.location.href='index.html'">Вернуться</button>
+                    </div>
+                `;
+            }
+        }
+        
+        // Обработка оплаченного инвойса
+        async function handleInvoicePaid(data) {
+            console.log('Оплачен инвойс:', data);
+            
+            // Получаем payload из инвойса
+            const payload = JSON.parse(data.payload || '{}');
+            const userId = payload.userId;
+            const amount = payload.amount;
+            
+            if (!userId || !amount) {
+                console.warn('Нет данных пользователя в payload');
+                return;
+            }
+            
+            // Находим пользователя
+            const user = getUserById(userId);
+            if (!user) {
+                console.warn('Пользователь не найден:', userId);
+                return;
+            }
+            
+            // Пополняем баланс
+            if (payload.type === 'deposit') {
+                user.realBalance = (user.realBalance || 0) + parseFloat(amount);
+                updateUser(user);
+                
+                // Сохраняем транзакцию
+                saveTransaction({
+                    userId: userId,
+                    type: 'deposit_crypto',
+                    amount: amount,
+                    currency: payload.currency || 'USD',
+                    cryptoAmount: data.amount,
+                    cryptoAsset: data.asset,
+                    invoiceId: data.invoice_id,
+                    status: 'completed',
+                    timestamp: new Date().toISOString()
+                });
+                
+                console.log(`Баланс пользователя ${user.username} пополнен на ${amount} USD`);
+            }
+        }
+        
+        // Обработка завершенного перевода (вывода средств)
+        async function handleTransferCompleted(data) {
+            console.log('Завершен вывод средств:', data);
+            
+            // Здесь можно обработать подтверждение вывода средств
+            // Например, отметить заявку на вывод как выполненную
+            
+            saveTransaction({
+                type: 'withdrawal_completed',
+                transferId: data.transfer_id,
+                amount: data.amount,
+                asset: data.asset,
+                status: 'completed',
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        // Запускаем обработку при загрузке страницы
+        document.addEventListener('DOMContentLoaded', handleWebhook);
+    </script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+    </style>
+</body>
+</html>

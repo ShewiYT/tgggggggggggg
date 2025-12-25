@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Резервный фонд бота | Админ-панель</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <button class="btn-icon" onclick="window.history.back()">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1>Резервный фонд бота</h1>
+            <div></div>
+        </header>
+
+        <main class="admin-panel">
+            <div class="admin-tabs">
+                <button class="tab-btn active" onclick="showTab('overview')">
+                    <i class="fas fa-chart-pie"></i> Обзор
+                </button>
+                <button class="tab-btn" onclick="showTab('history')">
+                    <i class="fas fa-history"></i> История
+                </button>
+                <button class="tab-btn" onclick="showTab('stats')">
+                    <i class="fas fa-chart-bar"></i> Статистика
+                </button>
+                <button class="tab-btn" onclick="showTab('users')">
+                    <i class="fas fa-users"></i> Пользователи
+                </button>
+            </div>
+
+            <div class="admin-content">
+                <!-- Вкладка Обзор -->
+                <div id="overviewTab" class="tab-content">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalFund">0</div>
+                            <div class="stat-label">Общий фонд</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="dailyCommission">0</div>
+                            <div class="stat-label">Комиссия за день</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="weeklyCommission">0</div>
+                            <div class="stat-label">Комиссия за неделю</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="monthlyCommission">0</div>
+                            <div class="stat-label">Комиссия за месяц</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container" style="margin-top: 24px;">
+                        <canvas id="commissionChart"></canvas>
+                    </div>
+
+                    <div class="info-box" style="margin-top: 20px; padding: 16px; background: var(--bg-secondary); border-radius: var(--border-radius);">
+                        <h3><i class="fas fa-info-circle"></i> Информация о комиссии</h3>
+                        <p style="margin-top: 8px; color: var(--text-secondary);">
+                            Комиссия взимается только при выполнении всех условий:<br>
+                            1. Игра на реальном балансе<br>
+                            2. Результат игры - выигрыш<br>
+                            3. Противник - не бот (онлайн игра)<br>
+                            <br>
+                            Размер комиссии: 5% от двойной ставки
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Вкладка История -->
+                <div id="historyTab" class="tab-content" style="display: none;">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Игрок</th>
+                                    <th>Ставка</th>
+                                    <th>Комиссия</th>
+                                    <th>Режим</th>
+                                </tr>
+                            </thead>
+                            <tbody id="commissionHistory">
+                                <!-- История загружается динамически -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="table-actions" style="margin-top: 16px;">
+                        <button class="btn-secondary" onclick="exportCommissionHistory()">
+                            <i class="fas fa-download"></i> Экспорт в CSV
+                        </button>
+                        <button class="btn-outline" onclick="clearOldHistory()">
+                            <i class="fas fa-trash"></i> Очистить старые записи
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Вкладка Статистика -->
+                <div id="statsTab" class="tab-content" style="display: none;">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalGames">0</div>
+                            <div class="stat-label">Всего игр с комиссией</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="avgCommission">0</div>
+                            <div class="stat-label">Средняя комиссия</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="maxCommission">0</div>
+                            <div class="stat-label">Максимальная комиссия</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="minCommission">0</div>
+                            <div class="stat-label">Минимальная комиссия</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container" style="margin-top: 24px;">
+                        <h3>Распределение комиссий по времени суток</h3>
+                        <canvas id="hourlyChart"></canvas>
+                    </div>
+
+                    <div class="chart-container" style="margin-top: 24px;">
+                        <h3>Тренд комиссий по дням</h3>
+                        <canvas id="dailyTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Вкладка Пользователи -->
+                <div id="usersTab" class="tab-content" style="display: none;">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Игрок</th>
+                                    <th>Всего комиссии</th>
+                                    <th>Игр с комиссией</th>
+                                    <th>Средняя ставка</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topUsersTable">
+                                <!-- Топ пользователей загружается динамически -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="user-details" id="userDetails" style="display: none; margin-top: 24px; padding: 20px; background: var(--bg-secondary); border-radius: var(--border-radius);">
+                        <h3>Детальная статистика пользователя</h3>
+                        <div id="userDetailsContent"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="storage.js"></script>
+    <script src="auth.js"></script>
+    <script src="commission.js"></script>
+    <script>
+        // Проверка прав администратора
+        document.addEventListener('DOMContentLoaded', function() {
+            const user = getCurrentUser();
+            if (!user || !user.isAdmin) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            loadCommissionData();
+            initCharts();
+        });
+        
+        // Загрузка данных комиссий
+        function loadCommissionData() {
+            const fund = getBotCommissionFund();
+            const stats = getCommissionStats();
+            
+            // Обновляем обзор
+            document.getElementById('totalFund').textContent = fund.total.toFixed(2);
+            document.getElementById('dailyCommission').textContent = fund.daily.toFixed(2);
+            document.getElementById('weeklyCommission').textContent = fund.weekly.toFixed(2);
+            document.getElementById('monthlyCommission').textContent = fund.monthly.toFixed(2);
+            
+            // Обновляем статистику
+            document.getElementById('totalGames').textContent = stats.totalGames;
+            document.getElementById('avgCommission').textContent = stats.averageCommission.toFixed(2);
+            
+            // Загружаем историю
+            loadCommissionHistory(stats.history);
+            
+            // Загружаем топ пользователей
+            loadTopUsers(stats.topUsers);
+        }
+        
+        // Загрузка истории комиссий
+        function loadCommissionHistory(history) {
+            const tbody = document.getElementById('commissionHistory');
+            tbody.innerHTML = '';
+            
+            history.reverse().forEach(record => {
+                const date = new Date(record.timestamp);
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>${date.toLocaleDateString()} ${date.toLocaleTimeString()}</td>
+                    <td>${record.username}</td>
+                    <td>${record.stake.toFixed(2)}</td>
+                    <td class="commission-cell">${record.amount.toFixed(2)}</td>
+                    <td>${record.gameMode}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Загрузка топ пользователей
+        function loadTopUsers(topUsers) {
+            const tbody = document.getElementById('topUsersTable');
+            tbody.innerHTML = '';
+            
+            topUsers.forEach((user, index) => {
+                const row = document.createElement('tr');
+                const avgStake = user.totalGames > 0 ? user.totalStake / user.totalGames : 0;
+                
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${user.username}</td>
+                    <td class="commission-cell">${user.totalCommission.toFixed(2)}</td>
+                    <td>${user.totalGames}</td>
+                    <td>${avgStake.toFixed(2)}</td>
+                    <td>
+                        <button class="btn-icon" onclick="showUserDetails('${user.username}')" title="Подробнее">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Показать детали пользователя
+        function showUserDetails(username) {
+            const stats = getCommissionStats();
+            const user = stats.topUsers.find(u => u.username === username);
+            
+            if (!user) return;
+            
+            const details = document.getElementById('userDetails');
+            const content = document.getElementById('userDetailsContent');
+            
+            const avgCommission = user.totalGames > 0 ? user.totalCommission / user.totalGames : 0;
+            
+            content.innerHTML = `
+                <h4>${username}</h4>
+                <div class="user-stats" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 16px;">
+                    <div>
+                        <strong>Всего комиссии:</strong>
+                        <div style="font-size: 24px; color: var(--primary-color);">${user.totalCommission.toFixed(2)}</div>
+                    </div>
+                    <div>
+                        <strong>Игр с комиссией:</strong>
+                        <div style="font-size: 24px; color: var(--info-color);">${user.totalGames}</div>
+                    </div>
+                    <div>
+                        <strong>Средняя комиссия:</strong>
+                        <div style="font-size: 20px;">${avgCommission.toFixed(2)}</div>
+                    </div>
+                    <div>
+                        <strong>Всего ставок:</strong>
+                        <div style="font-size: 20px;">${user.totalStake.toFixed(2)}</div>
+                    </div>
+                </div>
+                <div style="margin-top: 16px;">
+                    <button class="btn-outline" onclick="showUserCommissionHistory('${username}')">
+                        <i class="fas fa-list"></i> Показать историю комиссий
+                    </button>
+                </div>
+            `;
+            
+            details.style.display = 'block';
+        }
+        
+        // Показать историю комиссий пользователя
+        function showUserCommissionHistory(username) {
+            alert(`История комиссий для ${username} будет показана здесь.`);
+            // Реализация показа полной истории комиссий пользователя
+        }
+        
+        // Инициализация графиков
+        function initCharts() {
+            const stats = getCommissionStats();
+            
+            // Основной график комиссий
+            const ctx = document.getElementById('commissionChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['За день', 'За неделю', 'За месяц', 'Всего'],
+                    datasets: [{
+                        data: [
+                            stats.dailyTotal,
+                            stats.weeklyTotal,
+                            stats.monthlyTotal,
+                            stats.totalCommission
+                        ],
+                        backgroundColor: [
+                            '#FF6B35',
+                            '#FFA726',
+                            '#FF3D00',
+                            '#4CAF50'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            
+            // График по часам
+            const hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
+            const hourlyData = getHourlyCommissionData(stats.history);
+            
+            new Chart(hourlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                    datasets: [{
+                        label: 'Комиссия по часам',
+                        data: hourlyData,
+                        backgroundColor: 'rgba(255, 107, 53, 0.7)',
+                        borderColor: 'rgba(255, 107, 53, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Сумма комиссии'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Получить данные комиссий по часам
+        function getHourlyCommissionData(history) {
+            const hourlyData = Array(24).fill(0);
+            
+            history.forEach(record => {
+                const hour = new Date(record.timestamp).getHours();
+                hourlyData[hour] += record.amount;
+            });
+            
+            return hourlyData;
+        }
+        
+        // Переключение вкладок
+        function showTab(tabName) {
+            // Скрываем все вкладки
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            
+            // Убираем активный класс у всех кнопок
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Показываем выбранную вкладку
+            document.getElementById(`${tabName}Tab`).style.display = 'block';
+            
+            // Добавляем активный класс кнопке
+            event.target.classList.add('active');
+            
+            // Обновляем данные для вкладки статистики
+            if (tabName === 'stats') {
+                updateStatsTab();
+            }
+        }
+        
+        // Обновить вкладку статистики
+        function updateStatsTab() {
+            const stats = getCommissionStats();
+            const history = stats.history;
+            
+            // Находим максимальную и минимальную комиссию
+            let maxCommission = 0;
+            let minCommission = Infinity;
+            
+            history.forEach(record => {
+                if (record.amount > maxCommission) maxCommission = record.amount;
+                if (record.amount < minCommission) minCommission = record.amount;
+            });
+            
+            document.getElementById('maxCommission').textContent = maxCommission.toFixed(2);
+            document.getElementById('minCommission').textContent = minCommission === Infinity ? '0' : minCommission.toFixed(2);
+        }
+        
+        // Экспорт истории комиссий
+        function exportCommissionHistory() {
+            const stats = getCommissionStats();
+            const history = stats.history;
+            
+            let csv = 'Дата,Игрок,Ставка,Комиссия,Режим игры\n';
+            
+            history.forEach(record => {
+                const date = new Date(record.timestamp);
+                csv += `"${date.toLocaleString()}","${record.username}",${record.stake},${record.amount},"${record.gameMode}"\n`;
+            });
+            
+            // Создаем и скачиваем файл
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `commission_history_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Очистить старую историю
+        function clearOldHistory() {
+            if (confirm('Удалить все записи старше 30 дней?')) {
+                const history = getCommissionHistory();
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                
+                const filteredHistory = history.filter(record => 
+                    new Date(record.timestamp) > thirtyDaysAgo
+                );
+                
+                localStorage.setItem(COMMISSION_HISTORY_KEY, JSON.stringify(filteredHistory));
+                loadCommissionData();
+                alert('Старая история удалена!');
+            }
+        }
+    </script>
+    
+    <style>
+        .commission-cell {
+            color: var(--success-color);
+            font-weight: 600;
+        }
+        
+        .chart-container {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        
+        .chart-container h3 {
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+    </style>
+</body>
+</html>
